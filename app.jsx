@@ -305,44 +305,41 @@ function SecurityCamera() {
   const tilt = `rotate(${(angle * 0.16).toFixed(2)}deg)`;
 
   return (
-    <div style={{ position:'fixed', top:6, right:8, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, zIndex:9999, pointerEvents:'none' }}>
+    <div style={{ position:'fixed', top:8, right:0, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, zIndex:9999, pointerEvents:'none' }}>
 
-      {/* ── Câmera ── */}
-      <div style={{ pointerEvents:'auto', filter:'drop-shadow(1px 2px 0 rgba(0,0,0,0.2))', display:'flex', flexDirection:'column', alignItems:'center' }}>
-
-        {/* Suporte de parede */}
-        <div style={{ width:9, height:14, background:'linear-gradient(to bottom,#888,#555)', border:'1px solid #111', borderRadius:2, position:'relative', zIndex:2 }}>
-          <div style={{ position:'absolute', top:3, left:'50%', transform:'translateX(-50%)', width:2.5, height:2.5, borderRadius:'50%', background:'#111' }}/>
-          <div style={{ position:'absolute', bottom:3, left:'50%', transform:'translateX(-50%)', width:2.5, height:2.5, borderRadius:'50%', background:'#111' }}/>
-        </div>
+      {/* ── Câmera (montagem horizontal — parede direita) ── */}
+      <div style={{ pointerEvents:'auto', display:'flex', flexDirection:'row', alignItems:'center', filter:'drop-shadow(-2px 3px 0 rgba(0,0,0,0.28))' }}>
 
         {/* Corpo rotacionável */}
         <div style={{ transform:tilt, transition:'transform 180ms cubic-bezier(0.25,0.46,0.45,0.94)', position:'relative' }}>
 
           {/* Hood */}
-          <div style={{ position:'absolute', top:-5, left:0, right:0, height:6, background:'#111', borderRadius:'2px 2px 0 0', transform:'rotate(-2deg)' }}/>
+          <div style={{ position:'absolute', top:-5, left:2, right:2, height:6, background:'#111', borderRadius:'2px 2px 0 0', transform:'rotate(-1deg)' }}/>
 
           {/* Corpo */}
-          <div style={{ width:42, height:26, background:'linear-gradient(to bottom,#2b2b2e,#19191c)', border:'1.2px solid #000', borderRadius:'4px 7px 12px 3px', display:'flex', alignItems:'center', paddingLeft:5, position:'relative' }}>
-
-            {/* Cabo */}
-            <div style={{ position:'absolute', right:-3, bottom:5, width:5, height:3, background:'#111', transform:'rotate(6deg)', zIndex:-1 }}/>
+          <div style={{ width:44, height:26, background:'linear-gradient(to bottom,#2b2b2e,#19191c)', border:'1.2px solid #000', borderRadius:'5px 3px 3px 10px', display:'flex', alignItems:'center', paddingLeft:5, position:'relative' }}>
 
             {/* Lente */}
             <div ref={lensRef} style={{ width:20, height:20, borderRadius:'50%', background:'radial-gradient(circle at 30% 30%,#444,#0a0a0a)', border:'2px solid #000', boxShadow:'inset 0 0 3px rgba(0,0,0,0.9),inset 0 1px 5px rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', flexShrink:0 }}>
-
               <div className="cam-scan"/>
-
               {/* Pupila */}
               <div style={{ width:7, height:7, borderRadius:'50%', background:'radial-gradient(circle at 40% 35%,#1a3a5a,#050913)', boxShadow:'inset 0 0 3px rgba(80,130,200,0.4)', position:'absolute', transition:'transform 80ms linear', transform:`translate(${pupil.x.toFixed(2)}px,${pupil.y.toFixed(2)}px)` }}/>
-
               {/* Reflexo */}
               <div style={{ position:'absolute', top:3, left:3, width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.55)', filter:'blur(0.3px)', pointerEvents:'none' }}/>
             </div>
 
             {/* LED */}
-            <div style={{ position:'absolute', top:4, right:5, width:3.2, height:3.2, borderRadius:'50%', background:'#d8392f', opacity:blink?1:0.3, boxShadow:blink?'0 0 4px 2px rgba(216,57,47,0.5)':'none', transition:'opacity 200ms,box-shadow 200ms' }}/>
+            <div style={{ position:'absolute', top:4, right:6, width:3.2, height:3.2, borderRadius:'50%', background:'#d8392f', opacity:blink?1:0.3, boxShadow:blink?'0 0 4px 2px rgba(216,57,47,0.5)':'none', transition:'opacity 200ms,box-shadow 200ms' }}/>
           </div>
+        </div>
+
+        {/* Braço horizontal */}
+        <div style={{ width:10, height:7, background:'linear-gradient(to bottom,#6e6e6e,#484848)', borderTop:'1px solid #888', borderBottom:'1px solid #2a2a2a' }}/>
+
+        {/* Placa de parede — flush na borda direita */}
+        <div style={{ width:7, height:30, background:'linear-gradient(to right,#5a5a5a,#6a6a6a)', borderLeft:'1px solid #333', borderTop:'1px solid #777', borderBottom:'1px solid #333', borderRadius:'1px 0 0 1px', position:'relative', flexShrink:0 }}>
+          <div style={{ position:'absolute', top:5, left:'50%', transform:'translateX(-50%)', width:3, height:3, borderRadius:'50%', background:'#222', boxShadow:'inset 0 0 1px rgba(255,255,255,0.25)' }}/>
+          <div style={{ position:'absolute', bottom:5, left:'50%', transform:'translateX(-50%)', width:3, height:3, borderRadius:'50%', background:'#222', boxShadow:'inset 0 0 1px rgba(255,255,255,0.25)' }}/>
         </div>
       </div>
 
