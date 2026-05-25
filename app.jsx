@@ -355,6 +355,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <img src="assets/banner.svg" alt="" className="site-banner" aria-hidden="true"/>
       <Masthead tab={tab} setTab={setTab} currentUser={currentUser} onLogout={handleLogout} logoSrc={logoSrc}/>
 
       <main className="main-col">
