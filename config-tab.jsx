@@ -518,20 +518,31 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
   const lojasVisiveis = currentUser?.lojaId
     ? lojas.filter(l => l.id === currentUser.lojaId)
     : lojas;
-  const [local, setLocal] = useState({});
 
-  const hoje    = new Date();
-  const mesAtual = hoje.getMonth() + 1;
-  const anoAtual = hoje.getFullYear();
-  const nomeMesAtual = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const hoje     = new Date();
+  const [mesSel, setMesSel] = useState(hoje.getMonth() + 1);
+  const [anoSel, setAnoSel] = useState(hoje.getFullYear());
+  const [local, setLocal]   = useState({});
+
+  // Reseta campos locais ao trocar mês
+  const trocarMes = (mes, ano) => { setMesSel(mes); setAnoSel(ano); setLocal({}); };
+
+  // Gera opções: mês atual + 11 meses anteriores
+  const opcoesMes = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    return { mes: d.getMonth() + 1, ano: d.getFullYear(),
+      label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+  });
+
+  const nomeMesSel = opcoesMes.find(o => o.mes === mesSel && o.ano === anoSel)?.label || '';
+  const ehMesAtual = mesSel === hoje.getMonth() + 1 && anoSel === hoje.getFullYear();
 
   const getFatMes = (lojaId, mes, ano) =>
     faturamentoMensal.find(f => f.lojaId === lojaId && f.mes === mes && f.ano === ano);
 
   const get = (id, field) => {
     if (local[id]?.[field] !== undefined) return local[id][field];
-    const fat = getFatMes(id, mesAtual, anoAtual);
-    return String(fat?.[field] || '');
+    return String(getFatMes(id, mesSel, anoSel)?.[field] || '');
   };
   const set = (id, field, val) =>
     setLocal(prev => ({ ...prev, [id]: { ...(prev[id]||{}), [field]: val } }));
@@ -540,9 +551,9 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
     const faturamento = Number(get(loja.id, 'faturamento')) || 0;
     const meta        = Number(get(loja.id, 'meta')) || 0;
     dispatch({ type: 'UPSERT_FAT_MENSAL', payload: {
-      lojaId: loja.id, mes: mesAtual, ano: anoAtual, faturamento, meta,
+      lojaId: loja.id, mes: mesSel, ano: anoSel, faturamento, meta,
     }});
-    addToast(`${loja.nome} — ${nomeMesAtual} salvo.`, 'success');
+    addToast(`${loja.nome} — ${nomeMesSel} salvo.`, 'success');
     setLocal(prev => { const n = {...prev}; delete n[loja.id]; return n; });
   };
 
@@ -552,13 +563,35 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
 
   return (
     <div>
-      <div className="streak-info-box" style={{marginBottom:20}}>
-        Faturamento de <strong>{nomeMesAtual}</strong>. Cada mês é salvo separadamente —
-        o histórico fica preservado automaticamente no banco de dados.
+      {/* Seletor de mês */}
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+        <div className="field-select-wrap" style={{minWidth:220}}>
+          <select
+            className="field-select"
+            value={`${anoSel}-${mesSel}`}
+            onChange={e => {
+              const [a, m] = e.target.value.split('-').map(Number);
+              trocarMes(m, a);
+            }}
+          >
+            {opcoesMes.map(o => (
+              <option key={`${o.ano}-${o.mes}`} value={`${o.ano}-${o.mes}`}>
+                {o.label}{o.mes === hoje.getMonth()+1 && o.ano === hoje.getFullYear() ? ' (mês atual)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        {!ehMesAtual && (
+          <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:10,
+            color:'var(--brand-yellow)',letterSpacing:'.06em'}}>
+            EDITANDO MÊS ANTERIOR
+          </span>
+        )}
       </div>
+
       {lojasVisiveis.map(loja => {
         const hist = faturamentoMensal
-          .filter(f => f.lojaId === loja.id && !(f.mes === mesAtual && f.ano === anoAtual))
+          .filter(f => f.lojaId === loja.id && !(f.mes === mesSel && f.ano === anoSel))
           .sort((a, b) => b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes)
           .slice(0, 6);
         return (
@@ -566,14 +599,14 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
             <div className="config-row-name" style={{marginBottom:12,fontSize:16}}>{loja.nome}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:10,alignItems:'flex-end'}}>
               <FieldInput
-                label={`Faturamento líquido — ${nomeMesAtual} (R$)`}
+                label={`Faturamento líquido — ${nomeMesSel} (R$)`}
                 type="number"
                 value={get(loja.id, 'faturamento')}
                 onChange={v => set(loja.id, 'faturamento', v)}
                 placeholder="Ex: 850000"
               />
               <FieldInput
-                label={`Meta — ${nomeMesAtual} (R$)`}
+                label={`Meta — ${nomeMesSel} (R$)`}
                 type="number"
                 value={get(loja.id, 'meta')}
                 onChange={v => set(loja.id, 'meta', v)}
@@ -588,14 +621,19 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
               <div style={{marginTop:12}}>
                 <div style={{fontFamily:'Saira Condensed,sans-serif',fontSize:10,fontWeight:700,
                   textTransform:'uppercase',letterSpacing:'.1em',color:'var(--ink-4)',marginBottom:6}}>
-                  Histórico
+                  Outros meses
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {hist.map(f => (
-                    <div key={`${f.mes}-${f.ano}`} style={{
-                      fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'var(--ink-3)',
-                      background:'var(--paper-2)',padding:'4px 10px',border:'1px solid var(--rule)',
-                    }}>
+                    <button
+                      key={`${f.mes}-${f.ano}`}
+                      onClick={() => trocarMes(f.mes, f.ano)}
+                      style={{
+                        fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'var(--ink-3)',
+                        background:'var(--paper-2)',padding:'4px 10px',border:'1px solid var(--rule)',
+                        cursor:'pointer',
+                      }}
+                    >
                       <span style={{color:'var(--ink-4)'}}>{nomeMesAno(f.mes, f.ano)}</span>
                       {' · '}{fmtBRL(f.faturamento)}
                       {f.meta > 0 && (
@@ -603,7 +641,7 @@ function LojasSubtab({ state, dispatch, addToast, currentUser }) {
                           {` · ${((f.faturamento/f.meta)*100).toFixed(0)}%`}
                         </span>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
