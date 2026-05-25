@@ -23,7 +23,7 @@ function _fromRow(obj) {
 }
 
 async function loadFromSupabase() {
-  const [vend, crit, lanc, loja, user, comp, niv, cfg, fatM] = await Promise.all([
+  const [vend, crit, lanc, loja, user, comp, niv, cfg, fatM, curs] = await Promise.all([
     _sb.from('vendedores').select('*'),
     _sb.from('criterios').select('*'),
     _sb.from('lancamentos').select('*'),
@@ -33,6 +33,7 @@ async function loadFromSupabase() {
     _sb.from('niveis').select('*').order('min_pontos'),
     _sb.from('app_config').select('*').eq('id',1).single(),
     _sb.from('faturamento_mensal').select('loja_id,mes,ano,faturamento,meta'),
+    _sb.from('cursos').select('*').order('data', { ascending: false }),
   ]);
   return {
     schemaVersion:     SCHEMA_VERSION,
@@ -43,6 +44,11 @@ async function loadFromSupabase() {
     usuarios:          (user.data||[]).map(_fromRow),
     comprovantes:      (comp.data||[]).map(_fromRow),
     faturamentoMensal: (fatM.data||[]).map(_fromRow),
+    cursos: (curs.data||[]).map(c => ({
+      id: c.id, titulo: c.titulo, link: c.link||'',
+      descricao: c.descricao||'', data: c.data,
+      vendedorIds: Array.isArray(c.vendedor_ids) ? c.vendedor_ids : [],
+    })),
     config: {
       niveis:              (niv.data||[]).map(_fromRow),
       streakMultiplicador: cfg.data?.streak_multiplicador ?? 1.5,
@@ -56,6 +62,8 @@ async function syncAction(action) {
     switch (action.type) {
       case 'ADD_LANCAMENTO':
         await _sb.from('lancamentos').insert(_toRow(action.payload)); break;
+      case 'REMOVE_LANCAMENTO':
+        await _sb.from('lancamentos').delete().eq('id', action.payload); break;
       case 'ADD_VENDEDOR':
         await _sb.from('vendedores').insert(_toRow(action.payload)); break;
       case 'UPDATE_VENDEDOR':
@@ -107,6 +115,21 @@ async function syncAction(action) {
           { onConflict: 'loja_id,mes,ano' }
         ); break;
       }
+      case 'ADD_CURSO':
+        await _sb.from('cursos').insert({
+          id: action.payload.id, titulo: action.payload.titulo,
+          link: action.payload.link, descricao: action.payload.descricao,
+          data: action.payload.data, vendedor_ids: action.payload.vendedorIds || [],
+        }); break;
+      case 'REMOVE_CURSO':
+        await _sb.from('cursos').delete().eq('id', action.payload); break;
+      case 'UPDATE_CURSO':
+        await _sb.from('cursos').update({
+          titulo: action.payload.changes.titulo,
+          link: action.payload.changes.link,
+          descricao: action.payload.changes.descricao,
+          vendedor_ids: action.payload.changes.vendedorIds || [],
+        }).eq('id', action.payload.id); break;
       case 'RESET':
         await _sbReset(); break;
     }
@@ -205,6 +228,7 @@ const SEED_STATE = {
   comprovantes:      [],
   lojas:             SEED_LOJAS,
   faturamentoMensal: [],
+  cursos:            [],
 };
 
 // ── REDUCER ───────────────────────────────────────────────────────────────────
@@ -219,6 +243,7 @@ function reducer(state, action) {
       if (!p.comprovantes)      p.comprovantes      = [];
       if (!p.lojas)             p.lojas             = SEED_LOJAS;
       if (!p.faturamentoMensal) p.faturamentoMensal = [];
+      if (!p.cursos)            p.cursos            = [];
       else p.lojas = p.lojas.map(l => ({ faturamento:0, meta:0, ...l }));
       // garante que critérios do seed existam (injeta os que faltam por id)
       SEED_CRITERIOS.forEach(sc => {
@@ -235,7 +260,8 @@ function reducer(state, action) {
     }
     case 'SET_STATE':        return { ...action.payload };
     case 'RESET':            return SEED_STATE;
-    case 'ADD_LANCAMENTO':  return { ...state, lancamentos:[...state.lancamentos, action.payload] };
+    case 'ADD_LANCAMENTO':    return { ...state, lancamentos:[...state.lancamentos, action.payload] };
+    case 'REMOVE_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.filter(l=>l.id!==action.payload) };
     case 'ADD_VENDEDOR':    return { ...state, vendedores:[...state.vendedores, action.payload] };
     case 'UPDATE_VENDEDOR': return { ...state, vendedores:state.vendedores.map(v=>v.id===action.payload.id?{...v,...action.payload.changes}:v) };
     case 'REMOVE_VENDEDOR': return { ...state, vendedores:state.vendedores.filter(v=>v.id!==action.payload) };
@@ -252,6 +278,9 @@ function reducer(state, action) {
     case 'ADD_COMPROVANTE':    return { ...state, comprovantes:[...state.comprovantes, action.payload] };
     case 'REMOVE_COMPROVANTE': return { ...state, comprovantes:state.comprovantes.filter(c=>c.id!==action.payload) };
     case 'UPDATE_COMPROVANTE': return { ...state, comprovantes:state.comprovantes.map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
+    case 'ADD_CURSO':    return { ...state, cursos:[...(state.cursos||[]), action.payload] };
+    case 'REMOVE_CURSO': return { ...state, cursos:(state.cursos||[]).filter(c=>c.id!==action.payload) };
+    case 'UPDATE_CURSO': return { ...state, cursos:(state.cursos||[]).map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
     case 'ADD_LOJA':    return { ...state, lojas:[...(state.lojas||[]), action.payload] };
     case 'UPDATE_LOJA': return { ...state, lojas:(state.lojas||[]).map(l=>l.id===action.payload.id?{...l,...action.payload.changes}:l) };
     case 'REMOVE_LOJA': return { ...state, lojas:(state.lojas||[]).filter(l=>l.id!==action.payload) };

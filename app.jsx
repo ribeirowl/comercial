@@ -143,6 +143,7 @@ function Masthead({ tab, setTab, currentUser, onLogout, logoSrc }) {
     { num:'04', label:'FEED',     idx:3 },
     { num:'05', label:'AJUSTES',  idx:4, roles:['gerencia'] },
     { num:'05', label:'PERFIL',   idx:5, roles:['vendedor'] },
+    { num:'06', label:'CURSOS',   idx:6 },
   ];
 
   const visibleTabs = ALL_TABS.filter(t =>
@@ -390,7 +391,8 @@ function App() {
   const [density, setDensity] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const logoSrc = useLogo('assets/logo.png');
+  const logoSrc     = useLogo('assets/logo.png');
+  const logoDarkSrc = useLogo('assets/logo-dark.png');
 
   // Dispatch: atualiza estado local imediatamente e sincroniza com Supabase em background
   const dispatch = action => {
@@ -464,7 +466,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Masthead tab={tab} setTab={setTab} currentUser={currentUser} onLogout={handleLogout} logoSrc={logoSrc}/>
+      <Masthead tab={tab} setTab={setTab} currentUser={currentUser} onLogout={handleLogout} logoSrc={theme==='carbon'&&logoDarkSrc?logoDarkSrc:logoSrc}/>
 
       <main className="main-col">
         {tab===0 && <RankingTab  state={state} dispatch={dispatch} currentUser={currentUser}/>}
@@ -488,6 +490,14 @@ function App() {
         )}
         {tab===4 && (
           <ConfigTab
+            state={state}
+            dispatch={dispatch}
+            addToast={addToast}
+            currentUser={currentUser}
+          />
+        )}
+        {tab===6 && (
+          <CursosTab
             state={state}
             dispatch={dispatch}
             addToast={addToast}

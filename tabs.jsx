@@ -276,20 +276,32 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
 
   const editarStatus = (comp, novoStatus) => {
     const eraAprovado = comp.status === 'aprovado';
+    const virarAprovado = novoStatus === 'aprovado';
+
+    // aprovados ANTES desta mudança
+    const prevAprov = (state.comprovantes || []).filter(c =>
+      c.vendedorId === comp.vendedorId && c.status === 'aprovado'
+    ).length;
+    const newAprov = prevAprov + (virarAprovado && !eraAprovado ? 1 : 0) + (!virarAprovado && eraAprovado ? -1 : 0);
+    const prevLotes = Math.floor(prevAprov / META_CURSOS);
+    const newLotes  = Math.floor(newAprov  / META_CURSOS);
+    const delta     = newLotes - prevLotes;
+
     dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:novoStatus } } });
     setEditandoCompId(null);
-    if (novoStatus === 'aprovado' && !eraAprovado) {
-      const jaAprovados = (state.comprovantes || []).filter(c =>
-        c.vendedorId === comp.vendedorId && c.status === 'aprovado'
-      ).length;
-      const total = jaAprovados + 1;
-      const v = vendedores.find(x => x.id === comp.vendedorId);
-      if (total % META_CURSOS === 0) {
-        _lancarPontosCurso(comp.vendedorId, total);
-        addToast(`Meta atingida! +${ptsCurso} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
-      } else {
-        addToast(`Status atualizado para aprovado (${total}/${META_CURSOS}).`, 'success');
+
+    const v = vendedores.find(x => x.id === comp.vendedorId);
+    if (delta > 0) {
+      for (let i = 0; i < delta; i++) _lancarPontosCurso(comp.vendedorId, (prevLotes + i + 1) * META_CURSOS);
+      addToast(`Meta atingida! +${ptsCurso * delta} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
+    } else if (delta < 0) {
+      const lancsC9 = [...lancamentos]
+        .filter(l => l.vendedorId === comp.vendedorId && l.criterioId === 9)
+        .sort((a,b) => new Date(b.data) - new Date(a.data));
+      for (let i = 0; i < Math.abs(delta); i++) {
+        if (lancsC9[i]) dispatch({ type:'REMOVE_LANCAMENTO', payload: lancsC9[i].id });
       }
+      addToast(`Pontos de curso revertidos para ${nomeFirst(v?.nome||'?')}.`, 'info');
     } else {
       addToast('Status do comprovante atualizado.', 'info');
     }
@@ -1191,9 +1203,154 @@ function PerfilTab({ state, dispatch, addToast, currentUser }) {
   );
 }
 
+// ── CURSOS TAB ────────────────────────────────────────────────────────────────
+function CursosTab({ state, dispatch, addToast, currentUser }) {
+  const isGerencia = currentUser?.role === 'gerencia';
+  const vendedores = (state.vendedores || []).filter(v => v.ativo);
+  const cursos     = state.cursos || [];
+
+  const [titulo,      setTitulo]      = useState('');
+  const [link,        setLink]        = useState('');
+  const [descricao,   setDescricao]   = useState('');
+  const [todosVend,   setTodosVend]   = useState(true);
+  const [selVids,     setSelVids]     = useState([]);
+
+  const toggleVend = id => setSelVids(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  );
+
+  const handleAdd = () => {
+    if (!titulo.trim()) { addToast('Informe o título do curso.', 'error'); return; }
+    if (!link.trim())   { addToast('Informe o link do curso.', 'error'); return; }
+    if (!todosVend && selVids.length === 0) { addToast('Selecione ao menos um vendedor.', 'error'); return; }
+    dispatch({ type:'ADD_CURSO', payload:{
+      id: Date.now() + Math.random(),
+      titulo: titulo.trim(), link: link.trim(),
+      descricao: descricao.trim(),
+      data: new Date().toISOString(),
+      vendedorIds: todosVend ? [] : selVids,
+    }});
+    addToast('Curso adicionado!', 'success');
+    setTitulo(''); setLink(''); setDescricao(''); setSelVids([]); setTodosVend(true);
+  };
+
+  const handleRemove = curso => {
+    if (!window.confirm(`Remover "${curso.titulo}"?`)) return;
+    dispatch({ type:'REMOVE_CURSO', payload: curso.id });
+    addToast('Curso removido.', 'info');
+  };
+
+  const meusCursos = isGerencia
+    ? [...cursos].sort((a,b) => new Date(b.data)-new Date(a.data))
+    : cursos.filter(c => c.vendedorIds.length === 0 || c.vendedorIds.includes(currentUser?.vendedorId));
+
+  return (
+    <div>
+      <SectionHeader
+        eyebrowLeft="CAPACITAÇÃO"
+        eyebrowAccent="CURSOS"
+        title="Cursos e treinamentos"
+        byline="Links de cursos disponibilizados pela gestão para a equipe."
+      />
+
+      {isGerencia && (
+        <div className="form-block" style={{marginBottom:24}}>
+          <div className="section-eyebrow" style={{marginBottom:12}}>
+            ADICIONAR · <span className="accent">NOVO CURSO</span>
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">Título</label>
+            <input className="field-input" value={titulo} onChange={e=>setTitulo(e.target.value)} placeholder="Ex: Técnicas de negociação"/>
+          </div>
+          <div className="field-group">
+            <label className="field-label">Link do curso</label>
+            <input className="field-input" value={link} onChange={e=>setLink(e.target.value)} placeholder="https://..." type="url"/>
+          </div>
+          <div className="field-group">
+            <label className="field-label">Descrição (opcional)</label>
+            <input className="field-input" value={descricao} onChange={e=>setDescricao(e.target.value)} placeholder="Breve descrição do conteúdo..."/>
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">Destinatários</label>
+            <div className="seg-control" style={{marginBottom:8}}>
+              <button className={`seg-btn${todosVend?' active':''}`} onClick={()=>setTodosVend(true)}>Todos os vendedores</button>
+              <button className={`seg-btn${!todosVend?' active':''}`} onClick={()=>setTodosVend(false)}>Específicos</button>
+            </div>
+            {!todosVend && (
+              <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
+                {vendedores.map(v => (
+                  <button key={v.id}
+                    className={`seg-btn${selVids.includes(v.id)?' active':''}`}
+                    onClick={()=>toggleVend(v.id)}
+                    style={{fontSize:11}}
+                  >{nomeFirst(v.nome)}</button>
+                ))}
+                {vendedores.length === 0 && <span style={{color:'var(--ink-4)',fontSize:12}}>Nenhum vendedor ativo.</span>}
+              </div>
+            )}
+          </div>
+
+          <PrimaryBtn onClick={handleAdd}>Adicionar curso</PrimaryBtn>
+        </div>
+      )}
+
+      {meusCursos.length === 0 && <EmptyState msg="Nenhum curso disponível no momento."/>}
+
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {meusCursos.map(curso => {
+          const dest = curso.vendedorIds.length === 0
+            ? 'Todos os vendedores'
+            : curso.vendedorIds.map(id => {
+                const v = (state.vendedores||[]).find(x=>x.id===id);
+                return v ? nomeFirst(v.nome) : '?';
+              }).join(', ');
+          return (
+            <div key={curso.id} style={{
+              background:'var(--card-bg)', border:'1px solid var(--rule)',
+              borderRadius:6, padding:'14px 18px',
+              display:'flex', justifyContent:'space-between', alignItems:'center', gap:14,
+            }}>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontFamily:"'Anton',sans-serif",fontSize:15,textTransform:'uppercase',letterSpacing:'.02em',marginBottom:3}}>
+                  {curso.titulo}
+                </div>
+                {curso.descricao && (
+                  <div style={{fontFamily:"'Newsreader',serif",fontStyle:'italic',fontSize:12,color:'var(--ink-3)',marginBottom:5}}>
+                    {curso.descricao}
+                  </div>
+                )}
+                <div style={{display:'flex',gap:10,flexWrap:'wrap',fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'var(--ink-4)'}}>
+                  <span>{fmtData(curso.data)}</span>
+                  {isGerencia && <span>· {dest}</span>}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
+                <a href={curso.link} target="_blank" rel="noopener noreferrer"
+                  className="btn-aprovar" style={{textDecoration:'none',fontSize:12,padding:'6px 14px'}}>
+                  Acessar →
+                </a>
+                {isGerencia && (
+                  <button className="btn-danger" style={{padding:'6px 10px'}} onClick={()=>handleRemove(curso)}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
 window.RankingTab  = RankingTab;
 window.LancarTab   = LancarTab;
 window.VendedorTab = VendedorTab;
 window.FeedTab     = FeedTab;
 window.PerfilTab   = PerfilTab;
+window.CursosTab   = CursosTab;
