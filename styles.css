@@ -1529,7 +1529,22 @@ body::before {
   font-size: 15px; color: var(--ink-3);
 }
 
+/* ── SECURITY CAMERA ─────────────────────────────────────────────────────── */
+@keyframes camScan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(350%); }
+}
+.cam-scan {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 30%;
+  background: linear-gradient(to bottom, transparent, rgba(80,200,80,0.13) 50%, transparent);
+  animation: camScan 3.2s linear infinite;
+  pointer-events: none;
+}
+
 @media (max-width: 760px) {
+  .cam-sign { width: 112px !important; }
   .main-col { padding: 16px; }
   .masthead-logo-row { padding: 8px 16px; }
   .masthead-top { padding: 6px 16px; font-size: 9.5px; }

@@ -1,5 +1,5 @@
 // app.jsx — App shell, LoginScreen, Masthead, TweaksPanel, auth
-const { useState, useEffect, useReducer } = React;
+const { useState, useEffect, useReducer, useRef } = React;
 
 // Remove fundo branco do PNG via canvas: pixels com os 3 canais > 230 viram transparentes.
 // Abordagem pixel-a-pixel (sem BFS) é suficiente para logos que não têm branco no design.
@@ -272,6 +272,117 @@ function TweaksPanel({ theme, setTheme, accent, setAccent, density, setDensity, 
   );
 }
 
+// ── SECURITY CAMERA ───────────────────────────────────────────────────────────
+function SecurityCamera() {
+  const lensRef             = useRef(null);
+  const [pupil, setPupil]   = useState({ x: 0, y: 0 });
+  const [angle, setAngle]   = useState(0);
+  const [blink, setBlink]   = useState(true);
+  const [hover, setHover]   = useState(false);
+
+  useEffect(() => {
+    const onMove = e => {
+      if (!lensRef.current) return;
+      const r  = lensRef.current.getBoundingClientRect();
+      const cx = r.left + r.width  / 2;
+      const cy = r.top  + r.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      const k    = dist > 0 ? Math.min(5, dist / 40) : 0;
+      setPupil({ x: dist > 0 ? (dx / dist) * k : 0, y: dist > 0 ? (dy / dist) * k : 0 });
+      setAngle(Math.atan2(dy, dx) * (180 / Math.PI));
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setBlink(b => !b), 900);
+    return () => clearInterval(id);
+  }, []);
+
+  const tilt = `rotate(${(angle * 0.16).toFixed(2)}deg)`;
+
+  return (
+    <div style={{ position:'fixed', top:6, right:8, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, zIndex:9999, pointerEvents:'none' }}>
+
+      {/* ── Câmera ── */}
+      <div style={{ pointerEvents:'auto', filter:'drop-shadow(1px 2px 0 rgba(0,0,0,0.2))', display:'flex', flexDirection:'column', alignItems:'center' }}>
+
+        {/* Suporte de parede */}
+        <div style={{ width:9, height:14, background:'linear-gradient(to bottom,#888,#555)', border:'1px solid #111', borderRadius:2, position:'relative', zIndex:2 }}>
+          <div style={{ position:'absolute', top:3, left:'50%', transform:'translateX(-50%)', width:2.5, height:2.5, borderRadius:'50%', background:'#111' }}/>
+          <div style={{ position:'absolute', bottom:3, left:'50%', transform:'translateX(-50%)', width:2.5, height:2.5, borderRadius:'50%', background:'#111' }}/>
+        </div>
+
+        {/* Corpo rotacionável */}
+        <div style={{ transform:tilt, transition:'transform 180ms cubic-bezier(0.25,0.46,0.45,0.94)', position:'relative' }}>
+
+          {/* Hood */}
+          <div style={{ position:'absolute', top:-5, left:0, right:0, height:6, background:'#111', borderRadius:'2px 2px 0 0', transform:'rotate(-2deg)' }}/>
+
+          {/* Corpo */}
+          <div style={{ width:42, height:26, background:'linear-gradient(to bottom,#2b2b2e,#19191c)', border:'1.2px solid #000', borderRadius:'4px 7px 12px 3px', display:'flex', alignItems:'center', paddingLeft:5, position:'relative' }}>
+
+            {/* Cabo */}
+            <div style={{ position:'absolute', right:-3, bottom:5, width:5, height:3, background:'#111', transform:'rotate(6deg)', zIndex:-1 }}/>
+
+            {/* Lente */}
+            <div ref={lensRef} style={{ width:20, height:20, borderRadius:'50%', background:'radial-gradient(circle at 30% 30%,#444,#0a0a0a)', border:'2px solid #000', boxShadow:'inset 0 0 3px rgba(0,0,0,0.9),inset 0 1px 5px rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', flexShrink:0 }}>
+
+              <div className="cam-scan"/>
+
+              {/* Pupila */}
+              <div style={{ width:7, height:7, borderRadius:'50%', background:'radial-gradient(circle at 40% 35%,#1a3a5a,#050913)', boxShadow:'inset 0 0 3px rgba(80,130,200,0.4)', position:'absolute', transition:'transform 80ms linear', transform:`translate(${pupil.x.toFixed(2)}px,${pupil.y.toFixed(2)}px)` }}/>
+
+              {/* Reflexo */}
+              <div style={{ position:'absolute', top:3, left:3, width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.55)', filter:'blur(0.3px)', pointerEvents:'none' }}/>
+            </div>
+
+            {/* LED */}
+            <div style={{ position:'absolute', top:4, right:5, width:3.2, height:3.2, borderRadius:'50%', background:'#d8392f', opacity:blink?1:0.3, boxShadow:blink?'0 0 4px 2px rgba(216,57,47,0.5)':'none', transition:'opacity 200ms,box-shadow 200ms' }}/>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Placa ── */}
+      <div
+        className="cam-sign"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{ pointerEvents:'auto', width:132, background:'#ffc41f', border:'1.5px solid #000', boxShadow:'2px 3px 0 rgba(0,0,0,0.2)', borderRadius:2, padding:'4px 6px', position:'relative', transform:hover?'rotate(0deg) scale(1.05)':'rotate(-2deg)', transition:'transform 200ms ease', overflow:'hidden' }}
+      >
+        {/* Fitas adesivas */}
+        <div style={{ position:'absolute', top:5, left:-5, width:14, height:5, background:'rgba(255,255,255,0.4)', transform:'rotate(-32deg)', borderRadius:1 }}/>
+        <div style={{ position:'absolute', bottom:5, right:-5, width:14, height:5, background:'rgba(255,255,255,0.4)', transform:'rotate(-32deg)', borderRadius:1 }}/>
+
+        {/* Cabeçalho */}
+        <div style={{ display:'flex', alignItems:'center', gap:3, borderBottom:'1px dashed rgba(0,0,0,0.3)', paddingBottom:2, marginBottom:3 }}>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <circle cx="4" cy="4" r="3.2" stroke="#cc1111" strokeWidth="1"/>
+            <circle cx="4" cy="4" r="1.5" fill="#cc1111"/>
+          </svg>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:7.5, fontWeight:700, color:'#cc1111', letterSpacing:'.06em', textTransform:'uppercase' }}>ATENÇÃO</span>
+        </div>
+
+        {/* Corpo da placa */}
+        <div style={{ textAlign:'center', lineHeight:1.15, marginBottom:3 }}>
+          <div style={{ fontFamily:"'Anton',sans-serif", fontSize:15, color:'#111', textTransform:'uppercase', letterSpacing:'.02em' }}>SORRIA!</div>
+          <div style={{ fontFamily:"'Newsreader',serif", fontStyle:'italic', fontSize:8.5, color:'#444' }}>você está</div>
+          <div style={{ fontFamily:"'Anton',sans-serif", fontSize:15, color:'#cc1111', textTransform:'uppercase', letterSpacing:'.02em' }}>FILMADO</div>
+        </div>
+
+        {/* Rodapé */}
+        <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px dashed rgba(0,0,0,0.3)', paddingTop:2 }}>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:7, color:'#222', letterSpacing:'.05em' }}>24H · CFTV</span>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:7, color:blink?'#d8392f':'#999', letterSpacing:'.05em', transition:'color 300ms' }}>● REC</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
   const [state, baseDispatch] = useReducer(reducer, SEED_STATE);
@@ -349,6 +460,7 @@ function App() {
       <div className="app-shell">
         <LoginScreen onLogin={handleLogin} state={state} logoSrc={logoSrc}/>
         <ToastContainer toasts={toasts}/>
+        <SecurityCamera/>
       </div>
     );
   }
@@ -394,6 +506,7 @@ function App() {
         density={density} setDensity={setDensity}
         dispatch={dispatch}
       />
+      <SecurityCamera/>
     </div>
   );
 }
