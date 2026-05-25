@@ -1,5 +1,150 @@
-// data.jsx — seed data, reducer, utility functions
+// data.jsx — seed data, reducer, utility functions, Supabase client
 // All exports via window globals (no ES modules)
+
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const _SB_URL = 'https://odknmdnaavgmcpqvsiut.supabase.co';
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ka25tZG5hYXZnbWNwcXZzaXV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MTUxOTEsImV4cCI6MjA5NTI5MTE5MX0.nHXZJgt0SJdXwmiCqsjQ8MklgBPzznH6OVWFzkOP8To';
+const _sb = window.supabase.createClient(_SB_URL, _SB_KEY);
+
+// Mapeamento JS camelCase ↔ DB snake_case
+const _C2S = {
+  lojaId:'loja_id', vendedorId:'vendedor_id', criterioId:'criterio_id',
+  streakAplicado:'streak_aplicado', limitesPorMes:'limites_por_mes',
+  minPontos:'min_pontos', streakMultiplicador:'streak_multiplicador',
+  streakSemanas:'streak_semanas',
+};
+const _S2C = Object.fromEntries(Object.entries(_C2S).map(([k,v])=>[v,k]));
+
+function _toRow(obj) {
+  return Object.fromEntries(Object.entries(obj).map(([k,v]) => [_C2S[k]||k, v]));
+}
+function _fromRow(obj) {
+  return Object.fromEntries(Object.entries(obj).map(([k,v]) => [_S2C[k]||k, v]));
+}
+
+async function loadFromSupabase() {
+  const [vend, crit, lanc, loja, user, comp, niv, cfg] = await Promise.all([
+    _sb.from('vendedores').select('*'),
+    _sb.from('criterios').select('*'),
+    _sb.from('lancamentos').select('*'),
+    _sb.from('lojas').select('*'),
+    _sb.from('usuarios').select('*'),
+    _sb.from('comprovantes').select('id,vendedor_id,nome,tipo,data,status'),
+    _sb.from('niveis').select('*').order('min_pontos'),
+    _sb.from('app_config').select('*').eq('id',1).single(),
+  ]);
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    vendedores:   (vend.data||[]).map(_fromRow),
+    criterios:    (crit.data||[]).map(_fromRow),
+    lancamentos:  (lanc.data||[]).map(_fromRow),
+    lojas:        loja.data || [],
+    usuarios:     (user.data||[]).map(_fromRow),
+    comprovantes: (comp.data||[]).map(_fromRow),
+    config: {
+      niveis:              (niv.data||[]).map(_fromRow),
+      streakMultiplicador: cfg.data?.streak_multiplicador ?? 1.5,
+      streakSemanas:       cfg.data?.streak_semanas ?? 3,
+    },
+  };
+}
+
+async function syncAction(action) {
+  try {
+    switch (action.type) {
+      case 'ADD_LANCAMENTO':
+        await _sb.from('lancamentos').insert(_toRow(action.payload)); break;
+      case 'ADD_VENDEDOR':
+        await _sb.from('vendedores').insert(_toRow(action.payload)); break;
+      case 'UPDATE_VENDEDOR':
+        await _sb.from('vendedores').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+      case 'REMOVE_VENDEDOR':
+        await _sb.from('vendedores').delete().eq('id', action.payload); break;
+      case 'ADD_CRITERIO':
+        await _sb.from('criterios').insert(_toRow(action.payload)); break;
+      case 'UPDATE_CRITERIO': {
+        const { id, field, value } = action.payload;
+        await _sb.from('criterios').update(_toRow({[field]:value})).eq('id', id); break;
+      }
+      case 'REMOVE_CRITERIO':
+        await _sb.from('criterios').delete().eq('id', action.payload); break;
+      case 'ADD_NIVEL':
+        await _sb.from('niveis').insert(_toRow(action.payload)); break;
+      case 'UPDATE_NIVEL': {
+        const { id, field, value } = action.payload;
+        await _sb.from('niveis').update(_toRow({[field]:value})).eq('id', id); break;
+      }
+      case 'REMOVE_NIVEL':
+        await _sb.from('niveis').delete().eq('id', action.payload); break;
+      case 'UPDATE_CONFIG': {
+        const { field, value } = action.payload;
+        await _sb.from('app_config').update(_toRow({[field]:value})).eq('id', 1); break;
+      }
+      case 'ADD_USUARIO':
+        await _sb.from('usuarios').insert(_toRow(action.payload)); break;
+      case 'UPDATE_USUARIO':
+        await _sb.from('usuarios').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+      case 'REMOVE_USUARIO':
+        await _sb.from('usuarios').delete().eq('id', action.payload); break;
+      case 'ADD_COMPROVANTE':
+        await _sb.from('comprovantes').insert(_toRow(action.payload)); break;
+      case 'REMOVE_COMPROVANTE':
+        await _sb.from('comprovantes').delete().eq('id', action.payload); break;
+      case 'UPDATE_COMPROVANTE':
+        await _sb.from('comprovantes').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+      case 'ADD_LOJA':
+        await _sb.from('lojas').insert(action.payload); break;
+      case 'UPDATE_LOJA':
+        await _sb.from('lojas').update(action.payload.changes).eq('id', action.payload.id); break;
+      case 'REMOVE_LOJA':
+        await _sb.from('lojas').delete().eq('id', action.payload); break;
+      case 'RESET':
+        await _sbReset(); break;
+    }
+  } catch(e) {
+    console.error('[Supabase] syncAction error:', action.type, e);
+  }
+}
+
+async function _sbReset() {
+  await _sb.from('lancamentos').delete().gte('id', 0);
+  await _sb.from('comprovantes').delete().gte('id', 0);
+  await Promise.all([
+    _sb.from('vendedores').delete().gte('id', 0),
+    _sb.from('usuarios').delete().gte('id', 0),
+    _sb.from('criterios').delete().gte('id', 0),
+    _sb.from('niveis').delete().gte('id', 0),
+    _sb.from('lojas').delete().gte('id', 0),
+  ]);
+  await Promise.all([
+    _sb.from('lojas').insert([
+      { id:1, nome:'Francisco Beltrão', faturamento:0, meta:0 },
+      { id:2, nome:'Toledo', faturamento:0, meta:0 },
+      { id:3, nome:'Dois Vizinhos', faturamento:0, meta:0 },
+    ]),
+    _sb.from('criterios').insert([
+      { id:1, nome:'Sem atraso no mês', pontos:60, tipo:'positivo', limites_por_mes:1, modo:'simnao', oculto:false },
+      { id:2, nome:'Treinamento concluído', pontos:90, tipo:'positivo', limites_por_mes:0, modo:'simnao', oculto:false },
+      { id:3, nome:'Meta semanal atingida', pontos:100, tipo:'positivo', limites_por_mes:4, modo:'parcial', oculto:false },
+      { id:4, nome:'Meta por segmento', pontos:130, tipo:'positivo', limites_por_mes:0, modo:'parcial', oculto:false },
+      { id:5, nome:'Meta mensal atingida', pontos:250, tipo:'positivo', limites_por_mes:1, modo:'simnao', oculto:false },
+      { id:6, nome:'Prospecção de cliente', pontos:180, tipo:'positivo', limites_por_mes:0, modo:'simnao', oculto:false },
+      { id:7, nome:'Meta mensal 2 atingida', pontos:325, tipo:'positivo', limites_por_mes:1, modo:'simnao', oculto:false },
+      { id:8, nome:'Meta mensal 3 atingida', pontos:375, tipo:'positivo', limites_por_mes:1, modo:'simnao', oculto:false },
+      { id:9, nome:'Comprovante de curso aprovado', pontos:10, tipo:'positivo', limites_por_mes:0, modo:'simnao', oculto:true },
+    ]),
+    _sb.from('niveis').insert([
+      { id:1, nome:'Iniciante', min_pontos:0, cor:'#74747a' },
+      { id:2, nome:'Prata', min_pontos:500, cor:'#cfd1d4' },
+      { id:3, nome:'Ouro', min_pontos:1500, cor:'#ffc41f' },
+      { id:4, nome:'Diamante', min_pontos:3500, cor:'#7dd3fc' },
+    ]),
+    _sb.from('usuarios').insert([
+      { id:1, username:'Gabriel', password:'1414', role:'gerencia', vendedor_id:null, loja_id:null },
+    ]),
+  ]);
+  await _sb.from('app_config').upsert({ id:1, streak_multiplicador:1.5, streak_semanas:3 });
+}
 
 const SEED_USUARIOS = [
   { id:1, username:'Gabriel', password:'1414', role:'gerencia', vendedorId:null, lojaId:null },
@@ -76,7 +221,8 @@ function reducer(state, action) {
       p.criterios = p.criterios.map(c => renomes[c.nome] ? { ...c, nome: renomes[c.nome] } : c);
       return p;
     }
-    case 'RESET':           return SEED_STATE;
+    case 'SET_STATE':        return { ...action.payload };
+    case 'RESET':            return SEED_STATE;
     case 'ADD_LANCAMENTO':  return { ...state, lancamentos:[...state.lancamentos, action.payload] };
     case 'ADD_VENDEDOR':    return { ...state, vendedores:[...state.vendedores, action.payload] };
     case 'UPDATE_VENDEDOR': return { ...state, vendedores:state.vendedores.map(v=>v.id===action.payload.id?{...v,...action.payload.changes}:v) };
@@ -188,6 +334,9 @@ const LS_KEY = 'yes-mocelin-v3';
 // ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
 window.SEED_STATE          = SEED_STATE;
 window.reducer             = reducer;
+window._sb                 = _sb;
+window.loadFromSupabase    = loadFromSupabase;
+window.syncAction          = syncAction;
 window.getISOWeek          = getISOWeek;
 window.calcularStreak      = calcularStreak;
 window.calcularNivel       = calcularNivel;

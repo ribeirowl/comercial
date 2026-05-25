@@ -326,11 +326,21 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
   const verComp = comp => {
     const win = window.open('','_blank');
     if (!win) return;
-    if (comp.tipo?.startsWith('image/'))
-      win.document.write(`<!DOCTYPE html><html><body style="margin:0;background:#111;display:flex;justify-content:center;padding:20px"><img src="${comp.dados}" style="max-width:100%"/></body></html>`);
-    else
-      win.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${comp.dados}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
-    win.document.close();
+    const renderContent = dados => {
+      win.document.open();
+      if (comp.tipo?.startsWith('image/'))
+        win.document.write(`<!DOCTYPE html><html><body style="margin:0;background:#111;display:flex;justify-content:center;padding:20px"><img src="${dados}" style="max-width:100%"/></body></html>`);
+      else
+        win.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${dados}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+      win.document.close();
+    };
+    if (comp.dados) {
+      renderContent(comp.dados);
+    } else {
+      win.document.write('<p style="font-family:sans-serif;padding:30px;color:#666">Carregando arquivo...</p>');
+      _sb.from('comprovantes').select('dados').eq('id', comp.id).single()
+        .then(({ data }) => data?.dados ? renderContent(data.dados) : null);
+    }
   };
 
   const aprovarComp = comp => {
@@ -633,12 +643,21 @@ function ComprovantesSection({ vendedorId, state, dispatch, addToast }) {
   const verComp = comp => {
     const win = window.open('', '_blank');
     if (!win) return;
-    if (comp.tipo?.startsWith('image/')) {
-      win.document.write(`<!DOCTYPE html><html><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start;padding:20px"><img src="${comp.dados}" style="max-width:100%;border:none"/></body></html>`);
+    const renderContent = dados => {
+      win.document.open();
+      if (comp.tipo?.startsWith('image/'))
+        win.document.write(`<!DOCTYPE html><html><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start;padding:20px"><img src="${dados}" style="max-width:100%;border:none"/></body></html>`);
+      else
+        win.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${dados}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+      win.document.close();
+    };
+    if (comp.dados) {
+      renderContent(comp.dados);
     } else {
-      win.document.write(`<!DOCTYPE html><html><body style="margin:0"><iframe src="${comp.dados}" style="width:100%;height:100vh;border:none"></iframe></body></html>`);
+      win.document.write('<p style="font-family:sans-serif;padding:30px;color:#666">Carregando arquivo...</p>');
+      _sb.from('comprovantes').select('dados').eq('id', comp.id).single()
+        .then(({ data }) => data?.dados ? renderContent(data.dados) : null);
     }
-    win.document.close();
   };
 
   const iconeArquivo = tipo => {

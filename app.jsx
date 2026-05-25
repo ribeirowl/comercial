@@ -269,37 +269,33 @@ function TweaksPanel({ theme, setTheme, accent, setAccent, density, setDensity, 
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
-  const [state, dispatch] = useReducer(reducer, SEED_STATE);
+  const [state, baseDispatch] = useReducer(reducer, SEED_STATE);
   const [tab, setTab]     = useState(0);
   const [toasts, setToasts]   = useState([]);
   const [theme, setTheme]     = useState('paper');
   const [accent, setAccent]   = useState('#ffc41f');
   const [density, setDensity] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const logoSrc = useLogo('assets/logo.png');
 
-  // Restore session
+  // Dispatch: atualiza estado local imediatamente e sincroniza com Supabase em background
+  const dispatch = action => {
+    baseDispatch(action);
+    syncAction(action);
+  };
+
+  // Carrega dados do Supabase na inicialização
   useEffect(()=>{
-    // ?reset=1 na URL limpa o estado salvo
-    if (new URLSearchParams(window.location.search).get('reset') === '1') {
-      localStorage.removeItem(LS_KEY);
-      sessionStorage.removeItem(SS_KEY);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    const saved = localStorage.getItem(LS_KEY);
-    if (saved) {
-      try { dispatch({ type:'LOAD', payload:JSON.parse(saved) }); } catch(e) {}
-    }
+    loadFromSupabase()
+      .then(data => { baseDispatch({ type:'SET_STATE', payload:data }); })
+      .catch(e => console.error('[App] Falha ao carregar Supabase:', e))
+      .finally(() => setLoading(false));
     const session = sessionStorage.getItem(SS_KEY);
     if (session) {
       try { setCurrentUser(JSON.parse(session)); } catch(e) {}
     }
   }, []);
-
-  // Persist state
-  useEffect(()=>{
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-  }, [state]);
 
   // Apply theme + density
   useEffect(()=>{
@@ -331,6 +327,17 @@ function App() {
     setToasts(t=>[...t,{id,msg,type}]);
     setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)), 3200);
   };
+
+  if (loading) {
+    return (
+      <div className="app-shell" style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh'}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontFamily:'Anton,sans-serif',fontSize:32,letterSpacing:'.06em',textTransform:'uppercase'}}>YES! MOCELIN</div>
+          <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'var(--ink-4)',marginTop:10,letterSpacing:'.08em'}}>CARREGANDO DADOS...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
