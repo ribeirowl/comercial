@@ -18,48 +18,6 @@ function RankingTab({ state, dispatch, currentUser }) {
     })).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
   }, [vendedores, lancamentos, criterios, config, modo]);
 
-  const lojasRanking = useMemo(() => {
-    if (!lojas.length) return [];
-
-    const fatMensal = state.faturamentoMensal || [];
-    const hoje = new Date();
-    const mesAtual = hoje.getMonth() + 1;
-    const anoAtual = hoje.getFullYear();
-
-    // Calcula dados base de cada loja
-    const base = lojas.map(loja => {
-      const ativos = vendedores.filter(v => v.ativo && v.lojaId === loja.id);
-      const totalMesPts = ativos.reduce((s,v) => s + pontosMes(v.id, lancamentos), 0);
-      const avgPts = ativos.length > 0 ? totalMesPts / ativos.length : 0;
-      const fatData = fatMensal.find(f => f.lojaId === loja.id && f.mes === mesAtual && f.ano === anoAtual);
-      const fat    = fatData?.faturamento || 0;
-      const meta   = fatData?.meta || 0;
-      const pctMeta = meta > 0 ? (fat / meta) * 100 : 0;
-      const liderV = ativos.length > 0
-        ? ativos.reduce((best,v) => pontosMes(v.id,lancamentos) > pontosMes(best.id,lancamentos) ? v : best, ativos[0])
-        : null;
-      return { ...loja, ativos: ativos.length, avgPts, fat, meta, pctMeta, lider: liderV ? nomeCurto(liderV.nome) : '—' };
-    });
-
-    const maxFat    = Math.max(...base.map(l => l.fat), 1);
-    const maxAvgPts = Math.max(...base.map(l => l.avgPts), 1);
-    const anyFin    = base.some(l => l.fat > 0 || l.meta > 0);
-
-    return base.map(l => {
-      // Componente financeiro: ICP = 0,60×%Meta + 0,40×FatNorm
-      const fatNorm = (l.fat / maxFat) * 100;
-      const icpFin  = (0.60 * l.pctMeta) + (0.40 * fatNorm);
-      // Componente gamificação: pontuação média normalizada 0-100
-      const ptsNorm = (l.avgPts / maxAvgPts) * 100;
-      // Score final: 60% financeiro + 40% gamificação (ou só gamificação se sem dados financeiros)
-      const score = anyFin ? (0.60 * icpFin) + (0.40 * ptsNorm) : ptsNorm;
-      return { ...l, fatNorm, icpFin, ptsNorm, score };
-    }).sort((a,b) =>
-      Math.abs(b.score - a.score) > 0.05
-        ? b.score - a.score
-        : b.pctMeta - a.pctMeta  // empate: maior % de atingimento de meta
-    );
-  }, [lojas, vendedores, lancamentos, state.faturamentoMensal]);
 
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {
@@ -87,25 +45,6 @@ function RankingTab({ state, dispatch, currentUser }) {
       </tr>`;
     }).join('');
 
-    const lojasLinhas = lojasRanking.map((loja,i) => `
-      <tr class="${i===0?'leader':''}">
-        <td class="pos">${String(i+1).padStart(2,'0')}</td>
-        <td class="nome">${loja.nome}</td>
-        <td class="pts">${loja.score.toFixed(1)}</td>
-        <td class="centro">${loja.pctMeta>0?loja.pctMeta.toFixed(1)+'%':'—'}</td>
-        <td class="centro">${loja.ativos}</td>
-        <td class="centro">${loja.avgPts>0?Math.round(loja.avgPts)+' pts':'—'}</td>
-      </tr>`).join('');
-
-    const lojasSection = lojasRanking.length > 0 ? `
-      <div class="secao-titulo">Ranking de Lojas — Índice Composto Ponderado</div>
-      <table>
-        <thead><tr>
-          <th>Pos</th><th>Loja</th><th class="r">Índice</th><th class="r">% Meta</th>
-          <th class="r">Vendedores</th><th class="r">Média pts/v</th>
-        </tr></thead>
-        <tbody>${lojasLinhas}</tbody>
-      </table>` : '';
 
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Ranking YES! Mocelin</title>
@@ -165,7 +104,6 @@ tr.leader td.pts{color:#c9921a}
 </tr></thead>
 <tbody>${linhas}</tbody>
 </table>
-${lojasSection}
 <div class="rodape">
   <span>YES! MOCELIN · BOLETIM COMERCIAL · CONFIDENCIAL</span>
   <span>Gerado em ${new Date().toLocaleString('pt-BR')}</span>
@@ -258,53 +196,6 @@ ${lojasSection}
         })}
       </div>
 
-      {lojasRanking.length > 0 && currentUser?.role === 'gerencia' && (
-        <div className="lojas-ranking-wrap">
-          <div className="section-eyebrow" style={{marginBottom:8}}>
-            INTER-LOJAS · <span className="accent">RANKING MENSAL</span>
-          </div>
-          <div className="lojas-grid">
-            {lojasRanking.map((loja, i) => (
-              <div key={loja.id} className={`loja-card${i===0?' destaque':''}`}>
-
-                {/* cabeçalho: posição + % meta */}
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                  <div className="loja-card-pos">{String(i+1).padStart(2,'0')}</div>
-                  {loja.pctMeta > 0 && (
-                    <span style={{
-                      fontFamily:'JetBrains Mono,monospace', fontSize:10, fontWeight:700,
-                      color: loja.pctMeta >= 100 ? '#2d7d2d' : 'var(--ink-4)',
-                    }}>
-                      {loja.pctMeta.toFixed(1)}% meta
-                    </span>
-                  )}
-                </div>
-
-                <div className="loja-card-nome">{loja.nome}</div>
-
-                {/* score principal */}
-                <div className="loja-card-media">{loja.score.toFixed(1)}</div>
-                <div className="loja-card-pts-label">índice composto</div>
-
-                {/* subscores */}
-                <div className="loja-card-subscores">
-                  {(loja.fat > 0 || loja.meta > 0) && (
-                    <span>ICP fin. {loja.icpFin.toFixed(1)}</span>
-                  )}
-                  <span>Pts {loja.ptsNorm.toFixed(1)}</span>
-                </div>
-
-                {/* rodapé */}
-                <div className="loja-card-sub">
-                  {loja.ativos} vendedor{loja.ativos!==1?'es':''}
-                  {loja.lider !== '—' && ` · ${loja.lider}`}
-                  {loja.avgPts > 0 && ` · ${Math.round(loja.avgPts)} pts/v`}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -327,7 +218,10 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
   const pendentesComps = (state.comprovantes || []).filter(c =>
     (!c.status || c.status === 'pendente') && vidsVisiveis.has(c.vendedorId)
   );
-  const ptsCurso = criterios.find(c => c.id === 9)?.pontos ?? 10;
+  const ptsCurso   = criterios.find(c => c.id === 9)?.pontos ?? 10;
+  const META_CURSOS = 3;
+
+  const [editandoCompId, setEditandoCompId] = useState(null);
 
   const verComp = comp => {
     const win = window.open('','_blank');
@@ -349,22 +243,56 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     }
   };
 
-  const aprovarComp = comp => {
-    dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:'aprovado' } } });
+  const _lancarPontosCurso = (vendedorId, totalAprovados) => {
     const newId = Math.max(0, ...lancamentos.map(l=>l.id)) + 1;
     dispatch({ type:'ADD_LANCAMENTO', payload:{
-      id: newId, vendedorId: comp.vendedorId, criterioId: 9,
-      pontos: ptsCurso, obs: `Comprovante: ${comp.nome}`,
+      id: newId, vendedorId, criterioId: 9,
+      pontos: ptsCurso, obs: `Meta de ${META_CURSOS} cursos atingida (${totalAprovados} aprovados).`,
       data: new Date().toISOString(), streakAplicado: false,
     }});
-    const v = vendedores.find(x=>x.id===comp.vendedorId);
-    addToast(`Comprovante aprovado! +${ptsCurso} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
+  };
+
+  const aprovarComp = comp => {
+    dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:'aprovado' } } });
+    const jaAprovados = (state.comprovantes || []).filter(c =>
+      c.vendedorId === comp.vendedorId && c.status === 'aprovado'
+    ).length; // quantidade ANTES desta aprovação
+    const total = jaAprovados + 1;
+    const v = vendedores.find(x => x.id === comp.vendedorId);
+    if (total % META_CURSOS === 0) {
+      _lancarPontosCurso(comp.vendedorId, total);
+      addToast(`Meta de ${META_CURSOS} cursos atingida por ${nomeFirst(v?.nome||'?')}! +${ptsCurso} pts lançados.`, 'success');
+    } else {
+      const faltam = META_CURSOS - (total % META_CURSOS);
+      addToast(`Comprovante aprovado (${total}/${META_CURSOS}). Faltam ${faltam} curso${faltam>1?'s':''} para os pontos.`, 'success');
+    }
   };
 
   const rejeitarComp = comp => {
     dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:'rejeitado' } } });
     const v = vendedores.find(x=>x.id===comp.vendedorId);
     addToast(`Comprovante de ${nomeFirst(v?.nome||'?')} rejeitado.`, 'info');
+  };
+
+  const editarStatus = (comp, novoStatus) => {
+    const eraAprovado = comp.status === 'aprovado';
+    dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:novoStatus } } });
+    setEditandoCompId(null);
+    if (novoStatus === 'aprovado' && !eraAprovado) {
+      const jaAprovados = (state.comprovantes || []).filter(c =>
+        c.vendedorId === comp.vendedorId && c.status === 'aprovado'
+      ).length;
+      const total = jaAprovados + 1;
+      const v = vendedores.find(x => x.id === comp.vendedorId);
+      if (total % META_CURSOS === 0) {
+        _lancarPontosCurso(comp.vendedorId, total);
+        addToast(`Meta atingida! +${ptsCurso} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
+      } else {
+        addToast(`Status atualizado para aprovado (${total}/${META_CURSOS}).`, 'success');
+      }
+    } else {
+      addToast('Status do comprovante atualizado.', 'info');
+    }
   };
 
   const vendedor = vendedores.find(v => v.id === Number(vid));
@@ -439,6 +367,8 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
           </div>
           {pendentesComps.map(comp => {
             const v = vendedores.find(x=>x.id===comp.vendedorId);
+            const jaAprov = (state.comprovantes||[]).filter(c=>c.vendedorId===comp.vendedorId&&c.status==='aprovado').length;
+            const seriaON = (jaAprov + 1) % META_CURSOS === 0;
             return (
               <div key={comp.id} className="comp-pending-row">
                 <div className="comp-pending-icon">
@@ -453,14 +383,16 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                     <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
                     <span>{v?.nome||'?'}</span>
                     <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
+                    <span style={{color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace',fontSize:10}}>
+                      · {jaAprov}/{META_CURSOS} cursos
+                    </span>
                   </div>
                 </div>
                 <div className="comp-pending-actions">
                   <button className="comp-view-btn" onClick={()=>verComp(comp)}>Ver</button>
-                  <button
-                    className="btn-aprovar"
-                    onClick={()=>aprovarComp(comp)}
-                  >✓ Aprovar +{ptsCurso}pts</button>
+                  <button className="btn-aprovar" onClick={()=>aprovarComp(comp)}>
+                    {seriaON ? `✓ Aprovar +${ptsCurso}pts` : `✓ Aprovar (${jaAprov+1}/${META_CURSOS})`}
+                  </button>
                   <button className="btn-danger" style={{padding:'5px 12px',fontSize:11}} onClick={()=>rejeitarComp(comp)}>Rejeitar</button>
                 </div>
               </div>
@@ -468,6 +400,61 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
           })}
         </div>
       )}
+
+      {/* ── Comprovantes já analisados (com edição) ── */}
+      {(() => {
+        const analisados = (state.comprovantes||[]).filter(c =>
+          (c.status==='aprovado'||c.status==='rejeitado') && vidsVisiveis.has(c.vendedorId)
+        ).sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,20);
+        if (!analisados.length) return null;
+        return (
+          <div className="comp-pendentes-block" style={{marginTop:16}}>
+            <div className="section-eyebrow" style={{marginBottom:12}}>
+              ANALISADOS · <span className="accent">ÚLTIMOS {analisados.length}</span>
+            </div>
+            {analisados.map(comp => {
+              const v = vendedores.find(x=>x.id===comp.vendedorId);
+              const st = comp.status;
+              const editando = editandoCompId === comp.id;
+              return (
+                <div key={comp.id} className="comp-pending-row" style={{opacity:0.85}}>
+                  <div className="comp-pending-icon" style={{color:st==='aprovado'?'#2d7d2d':'#cc1111'}}>
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      {st==='aprovado'
+                        ? <path d="M4 10l5 5 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        : <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      }
+                    </svg>
+                  </div>
+                  <div className="comp-pending-info">
+                    <div className="comp-pending-nome">{comp.nome}</div>
+                    <div className="comp-pending-meta">
+                      <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
+                      <span>{v?.nome||'?'}</span>
+                      <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
+                      <span className={`comp-status-badge ${st}`} style={{marginLeft:4}}>
+                        {st==='aprovado'?'Aprovado':'Rejeitado'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="comp-pending-actions">
+                    <button className="comp-view-btn" onClick={()=>verComp(comp)}>Ver</button>
+                    {editando ? (
+                      <>
+                        <button className="btn-aprovar" style={{fontSize:11}} onClick={()=>editarStatus(comp,'aprovado')}>Aprovado</button>
+                        <button className="btn-danger" style={{padding:'5px 10px',fontSize:11}} onClick={()=>editarStatus(comp,'rejeitado')}>Rejeitado</button>
+                        <button className="btn-ghost" style={{padding:'5px 10px',fontSize:11}} onClick={()=>setEditandoCompId(null)}>Cancelar</button>
+                      </>
+                    ) : (
+                      <button className="btn-ghost" style={{padding:'5px 12px',fontSize:11}} onClick={()=>setEditandoCompId(comp.id)}>Editar</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <div className="lancar-grid">
         <div className="form-block">
@@ -682,9 +669,29 @@ function ComprovantesSection({ vendedorId, state, dispatch, addToast }) {
     );
   };
 
+  const META_CURSOS_V = 3;
+  const aprovados = meus.filter(c => c.status === 'aprovado').length;
+  const progresso = aprovados % META_CURSOS_V;
+  const lotes = Math.floor(aprovados / META_CURSOS_V);
+
   return (
     <div className="comp-section">
-      <h3>Comprovantes de cursos</h3>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8}}>
+        <h3 style={{marginBottom:0}}>Comprovantes de cursos</h3>
+        <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'var(--ink-3)'}}>
+          {aprovados} aprovado{aprovados!==1?'s':''}{lotes>0?` · ${lotes} lote${lotes>1?'s':''} de pontos`:''}
+        </span>
+      </div>
+      {/* Barra de progresso até próximos pontos */}
+      <div style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--ink-4)',marginBottom:4,fontFamily:'JetBrains Mono,monospace'}}>
+          <span>Próximos +10 pts</span>
+          <span>{progresso}/{META_CURSOS_V} cursos</span>
+        </div>
+        <div style={{height:4,background:'var(--rule)',borderRadius:2,overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${(progresso/META_CURSOS_V)*100}%`,background:'var(--accent)',borderRadius:2,transition:'width .4s ease'}}/>
+        </div>
+      </div>
 
       <div
         className="comp-upload-area"
