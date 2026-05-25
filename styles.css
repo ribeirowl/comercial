@@ -75,8 +75,6 @@ body::before {
 
 .app-shell { position: relative; z-index: 1; }
 
-.site-banner { width: 100%; display: block; height: auto; max-height: 190px; object-fit: cover; }
-
 /* ── MASTHEAD ────────────────────────────────────────────────────────────── */
 .masthead {
   position: sticky; top: 0; z-index: 100;
