@@ -85,43 +85,48 @@ function LoginScreen({ onLogin, state, logoSrc }) {
         </p>
         <hr style={{ border:'none', borderTop:'2px solid var(--ink)', marginBottom:20 }}/>
 
-        <div className="field-group">
-          <label className="field-label">Usuário</label>
-          <input
-            className="field-input"
-            type="text"
-            value={username}
-            onChange={e=>{ setUsername(e.target.value); setErro(''); }}
-            onKeyDown={e=>e.key==='Enter'&&handleLogin()}
-            placeholder="Nome de usuário..."
-            autoFocus
-          />
-        </div>
-
-        <div className="field-group">
-          <label className="field-label">Senha</label>
-          <div style={{ position:'relative' }}>
+        <form onSubmit={e=>{ e.preventDefault(); handleLogin(); }} autoComplete="on">
+          <div className="field-group">
+            <label className="field-label">Usuário</label>
             <input
               className="field-input"
-              type={showPw?'text':'password'}
-              value={password}
-              onChange={e=>{ setPassword(e.target.value); setErro(''); }}
-              onKeyDown={e=>e.key==='Enter'&&handleLogin()}
-              placeholder="Senha..."
-              style={{ paddingRight:44 }}
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={e=>{ setUsername(e.target.value); setErro(''); }}
+              placeholder="Nome de usuário..."
+              autoFocus
             />
-            <button
-              type="button"
-              onClick={()=>setShowPw(s=>!s)}
-              style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--ink-4)', fontSize:12, fontFamily:'JetBrains Mono,monospace', letterSpacing:'.04em' }}
-            >
-              {showPw?'OCULTAR':'VER'}
-            </button>
           </div>
-        </div>
 
-        {erro && <div className="error-box">{erro}</div>}
-        <PrimaryBtn onClick={handleLogin}>Entrar</PrimaryBtn>
+          <div className="field-group">
+            <label className="field-label">Senha</label>
+            <div style={{ position:'relative' }}>
+              <input
+                className="field-input"
+                type={showPw?'text':'password'}
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={e=>{ setPassword(e.target.value); setErro(''); }}
+                placeholder="Senha..."
+                style={{ paddingRight:44 }}
+              />
+              <button
+                type="button"
+                onClick={()=>setShowPw(s=>!s)}
+                style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--ink-4)', fontSize:12, fontFamily:'JetBrains Mono,monospace', letterSpacing:'.04em' }}
+              >
+                {showPw?'OCULTAR':'VER'}
+              </button>
+            </div>
+          </div>
+
+          {erro && <div className="error-box">{erro}</div>}
+          <button type="submit" style={{display:'none'}} aria-hidden="true"/>
+          <PrimaryBtn onClick={handleLogin}>Entrar</PrimaryBtn>
+        </form>
       </div>
 
       <div className="login-footer">YES! MOCELIN · BOLETIM COMERCIAL</div>
