@@ -21,13 +21,19 @@ function RankingTab({ state, dispatch, currentUser }) {
   const lojasRanking = useMemo(() => {
     if (!lojas.length) return [];
 
+    const fatMensal = state.faturamentoMensal || [];
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth() + 1;
+    const anoAtual = hoje.getFullYear();
+
     // Calcula dados base de cada loja
     const base = lojas.map(loja => {
       const ativos = vendedores.filter(v => v.ativo && v.lojaId === loja.id);
       const totalMesPts = ativos.reduce((s,v) => s + pontosMes(v.id, lancamentos), 0);
       const avgPts = ativos.length > 0 ? totalMesPts / ativos.length : 0;
-      const fat    = loja.faturamento || 0;
-      const meta   = loja.meta || 0;
+      const fatData = fatMensal.find(f => f.lojaId === loja.id && f.mes === mesAtual && f.ano === anoAtual);
+      const fat    = fatData?.faturamento || 0;
+      const meta   = fatData?.meta || 0;
       const pctMeta = meta > 0 ? (fat / meta) * 100 : 0;
       const liderV = ativos.length > 0
         ? ativos.reduce((best,v) => pontosMes(v.id,lancamentos) > pontosMes(best.id,lancamentos) ? v : best, ativos[0])
@@ -53,7 +59,7 @@ function RankingTab({ state, dispatch, currentUser }) {
         ? b.score - a.score
         : b.pctMeta - a.pctMeta  // empate: maior % de atingimento de meta
     );
-  }, [lojas, vendedores, lancamentos]);
+  }, [lojas, vendedores, lancamentos, state.faturamentoMensal]);
 
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {

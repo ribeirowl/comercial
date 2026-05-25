@@ -23,7 +23,7 @@ function _fromRow(obj) {
 }
 
 async function loadFromSupabase() {
-  const [vend, crit, lanc, loja, user, comp, niv, cfg] = await Promise.all([
+  const [vend, crit, lanc, loja, user, comp, niv, cfg, fatM] = await Promise.all([
     _sb.from('vendedores').select('*'),
     _sb.from('criterios').select('*'),
     _sb.from('lancamentos').select('*'),
@@ -32,15 +32,17 @@ async function loadFromSupabase() {
     _sb.from('comprovantes').select('id,vendedor_id,nome,tipo,data,status'),
     _sb.from('niveis').select('*').order('min_pontos'),
     _sb.from('app_config').select('*').eq('id',1).single(),
+    _sb.from('faturamento_mensal').select('loja_id,mes,ano,faturamento,meta'),
   ]);
   return {
-    schemaVersion: SCHEMA_VERSION,
-    vendedores:   (vend.data||[]).map(_fromRow),
-    criterios:    (crit.data||[]).map(_fromRow),
-    lancamentos:  (lanc.data||[]).map(_fromRow),
-    lojas:        loja.data || [],
-    usuarios:     (user.data||[]).map(_fromRow),
-    comprovantes: (comp.data||[]).map(_fromRow),
+    schemaVersion:     SCHEMA_VERSION,
+    vendedores:        (vend.data||[]).map(_fromRow),
+    criterios:         (crit.data||[]).map(_fromRow),
+    lancamentos:       (lanc.data||[]).map(_fromRow),
+    lojas:             loja.data || [],
+    usuarios:          (user.data||[]).map(_fromRow),
+    comprovantes:      (comp.data||[]).map(_fromRow),
+    faturamentoMensal: (fatM.data||[]).map(_fromRow),
     config: {
       niveis:              (niv.data||[]).map(_fromRow),
       streakMultiplicador: cfg.data?.streak_multiplicador ?? 1.5,
@@ -98,6 +100,13 @@ async function syncAction(action) {
         await _sb.from('lojas').update(action.payload.changes).eq('id', action.payload.id); break;
       case 'REMOVE_LOJA':
         await _sb.from('lojas').delete().eq('id', action.payload); break;
+      case 'UPSERT_FAT_MENSAL': {
+        const { lojaId, mes, ano, faturamento, meta } = action.payload;
+        await _sb.from('faturamento_mensal').upsert(
+          { loja_id: lojaId, mes, ano, faturamento, meta },
+          { onConflict: 'loja_id,mes,ano' }
+        ); break;
+      }
       case 'RESET':
         await _sbReset(); break;
     }
@@ -109,6 +118,7 @@ async function syncAction(action) {
 async function _sbReset() {
   await _sb.from('lancamentos').delete().gte('id', 0);
   await _sb.from('comprovantes').delete().gte('id', 0);
+  await _sb.from('faturamento_mensal').delete().gte('mes', 1);
   await Promise.all([
     _sb.from('vendedores').delete().gte('id', 0),
     _sb.from('usuarios').delete().gte('id', 0),
@@ -186,14 +196,15 @@ const SEED_CONFIG = {
 const SCHEMA_VERSION = 2;
 
 const SEED_STATE = {
-  schemaVersion: SCHEMA_VERSION,
-  vendedores:    SEED_VENDEDORES,
-  criterios:     SEED_CRITERIOS,
-  lancamentos:   SEED_LANCAMENTOS,
-  config:        SEED_CONFIG,
-  usuarios:      SEED_USUARIOS,
-  comprovantes:  [],
-  lojas:         SEED_LOJAS,
+  schemaVersion:     SCHEMA_VERSION,
+  vendedores:        SEED_VENDEDORES,
+  criterios:         SEED_CRITERIOS,
+  lancamentos:       SEED_LANCAMENTOS,
+  config:            SEED_CONFIG,
+  usuarios:          SEED_USUARIOS,
+  comprovantes:      [],
+  lojas:             SEED_LOJAS,
+  faturamentoMensal: [],
 };
 
 // ── REDUCER ───────────────────────────────────────────────────────────────────
@@ -205,8 +216,9 @@ function reducer(state, action) {
       if (!p.schemaVersion || p.schemaVersion < SCHEMA_VERSION) return { ...SEED_STATE };
       if (!p.usuarios)     p.usuarios     = SEED_USUARIOS;
       else p.usuarios = p.usuarios.map(u => ({ lojaId: null, ...u }));
-      if (!p.comprovantes) p.comprovantes = [];
-      if (!p.lojas)        p.lojas        = SEED_LOJAS;
+      if (!p.comprovantes)      p.comprovantes      = [];
+      if (!p.lojas)             p.lojas             = SEED_LOJAS;
+      if (!p.faturamentoMensal) p.faturamentoMensal = [];
       else p.lojas = p.lojas.map(l => ({ faturamento:0, meta:0, ...l }));
       // garante que critérios do seed existam (injeta os que faltam por id)
       SEED_CRITERIOS.forEach(sc => {
@@ -243,6 +255,13 @@ function reducer(state, action) {
     case 'ADD_LOJA':    return { ...state, lojas:[...(state.lojas||[]), action.payload] };
     case 'UPDATE_LOJA': return { ...state, lojas:(state.lojas||[]).map(l=>l.id===action.payload.id?{...l,...action.payload.changes}:l) };
     case 'REMOVE_LOJA': return { ...state, lojas:(state.lojas||[]).filter(l=>l.id!==action.payload) };
+    case 'UPSERT_FAT_MENSAL': {
+      const p = action.payload;
+      const outros = (state.faturamentoMensal||[]).filter(
+        f => !(f.lojaId===p.lojaId && f.mes===p.mes && f.ano===p.ano)
+      );
+      return { ...state, faturamentoMensal: [...outros, p] };
+    }
     default:                   return state;
   }
 }

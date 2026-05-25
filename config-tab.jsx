@@ -514,64 +514,103 @@ function UsuariosSubtab({ state, dispatch, addToast, currentUser }) {
 
 // ── LOJAS SUBTAB ─────────────────────────────────────────────────────────────
 function LojasSubtab({ state, dispatch, addToast, currentUser }) {
-  const { lojas = [] } = state;
-  // Gerente local edita somente sua loja; super-admin edita todas
+  const { lojas = [], faturamentoMensal = [] } = state;
   const lojasVisiveis = currentUser?.lojaId
     ? lojas.filter(l => l.id === currentUser.lojaId)
     : lojas;
   const [local, setLocal] = useState({});
 
-  const get = (id, field, loja) =>
-    local[id]?.[field] !== undefined ? local[id][field] : String(loja[field] || '');
+  const hoje    = new Date();
+  const mesAtual = hoje.getMonth() + 1;
+  const anoAtual = hoje.getFullYear();
+  const nomeMesAtual = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const getFatMes = (lojaId, mes, ano) =>
+    faturamentoMensal.find(f => f.lojaId === lojaId && f.mes === mes && f.ano === ano);
+
+  const get = (id, field) => {
+    if (local[id]?.[field] !== undefined) return local[id][field];
+    const fat = getFatMes(id, mesAtual, anoAtual);
+    return String(fat?.[field] || '');
+  };
   const set = (id, field, val) =>
     setLocal(prev => ({ ...prev, [id]: { ...(prev[id]||{}), [field]: val } }));
 
   const salvar = loja => {
-    const fat  = Number(get(loja.id,'faturamento',loja)) || 0;
-    const meta = Number(get(loja.id,'meta',loja)) || 0;
-    dispatch({ type:'UPDATE_LOJA', payload:{ id:loja.id, changes:{ faturamento:fat, meta } } });
-    addToast(`${loja.nome} atualizada.`, 'success');
+    const faturamento = Number(get(loja.id, 'faturamento')) || 0;
+    const meta        = Number(get(loja.id, 'meta')) || 0;
+    dispatch({ type: 'UPSERT_FAT_MENSAL', payload: {
+      lojaId: loja.id, mes: mesAtual, ano: anoAtual, faturamento, meta,
+    }});
+    addToast(`${loja.nome} — ${nomeMesAtual} salvo.`, 'success');
+    setLocal(prev => { const n = {...prev}; delete n[loja.id]; return n; });
   };
 
   const fmtBRL = val => val > 0 ? `R$ ${Number(val).toLocaleString('pt-BR')}` : '—';
+  const nomeMesAno = (mes, ano) =>
+    new Date(ano, mes - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
 
   return (
     <div>
       <div className="streak-info-box" style={{marginBottom:20}}>
-        Informe o <strong>faturamento líquido</strong> e a <strong>meta mensal</strong> de cada loja.
-        O ranking usa o <em>Índice Composto Ponderado</em>: 60% financeiro + 40% pontuação média dos vendedores.
+        Faturamento de <strong>{nomeMesAtual}</strong>. Cada mês é salvo separadamente —
+        o histórico fica preservado automaticamente no banco de dados.
       </div>
-      {lojasVisiveis.map(loja => (
-        <div key={loja.id} className="config-row" style={{flexWrap:'wrap',gap:12,padding:'18px 0',alignItems:'flex-end',borderBottom:'1px solid var(--rule)'}}>
-          <div style={{minWidth:160}}>
-            <div className="config-row-name">{loja.nome}</div>
-            <div className="config-row-sub">
-              {loja.faturamento > 0 || loja.meta > 0
-                ? `${fmtBRL(loja.faturamento)} · ${loja.meta > 0 ? ((loja.faturamento/loja.meta)*100).toFixed(1)+'% da meta' : 'sem meta'}`
-                : 'Dados não informados'}
+      {lojasVisiveis.map(loja => {
+        const hist = faturamentoMensal
+          .filter(f => f.lojaId === loja.id && !(f.mes === mesAtual && f.ano === anoAtual))
+          .sort((a, b) => b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes)
+          .slice(0, 6);
+        return (
+          <div key={loja.id} style={{marginBottom:28,paddingBottom:20,borderBottom:'1px solid var(--rule)'}}>
+            <div className="config-row-name" style={{marginBottom:12,fontSize:16}}>{loja.nome}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:10,alignItems:'flex-end'}}>
+              <FieldInput
+                label={`Faturamento líquido — ${nomeMesAtual} (R$)`}
+                type="number"
+                value={get(loja.id, 'faturamento')}
+                onChange={v => set(loja.id, 'faturamento', v)}
+                placeholder="Ex: 850000"
+              />
+              <FieldInput
+                label={`Meta — ${nomeMesAtual} (R$)`}
+                type="number"
+                value={get(loja.id, 'meta')}
+                onChange={v => set(loja.id, 'meta', v)}
+                placeholder="Ex: 800000"
+              />
+              <button className="btn-ghost" style={{padding:'8px 18px'}} onClick={() => salvar(loja)}>
+                Salvar
+              </button>
             </div>
+
+            {hist.length > 0 && (
+              <div style={{marginTop:12}}>
+                <div style={{fontFamily:'Saira Condensed,sans-serif',fontSize:10,fontWeight:700,
+                  textTransform:'uppercase',letterSpacing:'.1em',color:'var(--ink-4)',marginBottom:6}}>
+                  Histórico
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {hist.map(f => (
+                    <div key={`${f.mes}-${f.ano}`} style={{
+                      fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'var(--ink-3)',
+                      background:'var(--paper-2)',padding:'4px 10px',border:'1px solid var(--rule)',
+                    }}>
+                      <span style={{color:'var(--ink-4)'}}>{nomeMesAno(f.mes, f.ano)}</span>
+                      {' · '}{fmtBRL(f.faturamento)}
+                      {f.meta > 0 && (
+                        <span style={{color: f.faturamento >= f.meta ? '#2d7d2d' : 'var(--ink-4)'}}>
+                          {` · ${((f.faturamento/f.meta)*100).toFixed(0)}%`}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,flex:1,minWidth:280}}>
-            <FieldInput
-              label="Faturamento líquido (R$)"
-              type="number"
-              value={get(loja.id,'faturamento',loja)}
-              onChange={v=>set(loja.id,'faturamento',v)}
-              placeholder="Ex: 850000"
-            />
-            <FieldInput
-              label="Meta mensal (R$)"
-              type="number"
-              value={get(loja.id,'meta',loja)}
-              onChange={v=>set(loja.id,'meta',v)}
-              placeholder="Ex: 800000"
-            />
-          </div>
-          <button className="btn-ghost" style={{padding:'8px 18px'}} onClick={()=>salvar(loja)}>
-            Salvar
-          </button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
