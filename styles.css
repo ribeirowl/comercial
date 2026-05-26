@@ -144,6 +144,11 @@ body::before {
   mix-blend-mode: multiply;
 }
 
+/* tema escuro: screen torna o fundo preto da logo-dark transparente, deixando só o amarelo/branco visível */
+.theme-carbon .masthead-logo {
+  mix-blend-mode: screen;
+}
+
 .masthead-tagline-wrap {
   display: flex; flex-direction: column; gap: 5px;
 }

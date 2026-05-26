@@ -22,11 +22,11 @@ function RankingTab({ state, dispatch, currentUser }) {
   const cursosLoja = useMemo(() => {
     const comps = state.comprovantes || [];
     return lojas.map(loja => {
-      const vidsLoja = vendedores.filter(v => v.ativo && v.lojaId === loja.id).map(v => v.id);
+      const vidsLoja = vendedores.filter(v => v.ativo && (v.lojaId === loja.id || Number(v.lojaId) === Number(loja.id))).map(v => v.id);
       const aprovados = comps.filter(c => c.status === 'aprovado' && vidsLoja.includes(Number(c.vendedorId)));
       const vComCurso = new Set(aprovados.map(c => c.vendedorId)).size;
       return { ...loja, totalCursos: aprovados.length, vAtivos: vidsLoja.length, vComCurso };
-    }).filter(l => l.vAtivos > 0).sort((a,b) => b.totalCursos - a.totalCursos);
+    }).filter(l => l.totalCursos > 0).sort((a,b) => b.totalCursos - a.totalCursos);
   }, [lojas, vendedores, state.comprovantes]);
 
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
@@ -207,44 +207,48 @@ tr.leader td.pts{color:#c9921a}
       </div>
 
       {/* ── Ranking de cursos por unidade ── */}
-      {cursosLoja.length > 0 && (
+      {lojas.length > 0 && (
         <div style={{marginTop:32}}>
           <div className="section-eyebrow" style={{marginBottom:12}}>
             CAPACITAÇÃO · <span className="accent">CURSOS POR UNIDADE</span>
           </div>
-          <div className="rk-table">
-            <div className="rk-header">
-              <div className="rk-cell">POS</div>
-              <div className="rk-cell">UNIDADE</div>
-              <div className="rk-cell rk-progress-col">PROGRESSO</div>
-              <div className="rk-cell" style={{textAlign:'right'}}>CURSOS</div>
-            </div>
-            {cursosLoja.map((loja, i) => {
-              const maxC = cursosLoja[0].totalCursos || 1;
-              const pct  = (loja.totalCursos / maxC) * 100;
-              return (
-                <div key={loja.id} className={`rk-row${i===0?' pos-1':''}`}>
-                  <div className="rk-cell">
-                    <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
-                  </div>
-                  <div className="rk-cell">
-                    <div className="rk-name-main">{loja.nome}</div>
-                    <div className="rk-name-sub">
-                      <span className="rk-lancamentos">{loja.vAtivos} vendedor{loja.vAtivos!==1?'es':''}</span>
-                      {loja.vComCurso > 0 && <span className="rk-lancamentos"> · {loja.vComCurso} com cursos</span>}
+          {cursosLoja.length === 0 ? (
+            <EmptyState msg="Nenhum comprovante de curso aprovado ainda." />
+          ) : (
+            <div className="rk-table">
+              <div className="rk-header">
+                <div className="rk-cell">POS</div>
+                <div className="rk-cell">UNIDADE</div>
+                <div className="rk-cell rk-progress-col">PROGRESSO</div>
+                <div className="rk-cell" style={{textAlign:'right'}}>CURSOS</div>
+              </div>
+              {cursosLoja.map((loja, i) => {
+                const maxC = cursosLoja[0].totalCursos || 1;
+                const pct  = (loja.totalCursos / maxC) * 100;
+                return (
+                  <div key={loja.id} className={`rk-row${i===0?' pos-1':''}`}>
+                    <div className="rk-cell">
+                      <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
+                    </div>
+                    <div className="rk-cell">
+                      <div className="rk-name-main">{loja.nome}</div>
+                      <div className="rk-name-sub">
+                        <span className="rk-lancamentos">{loja.vAtivos} vendedor{loja.vAtivos!==1?'es':''}</span>
+                        {loja.vComCurso > 0 && <span className="rk-lancamentos"> · {loja.vComCurso} com cursos</span>}
+                      </div>
+                    </div>
+                    <div className="rk-cell rk-progress-col">
+                      <ProgressBar pct={pct} leader={i===0}/>
+                    </div>
+                    <div className="rk-cell" style={{textAlign:'right'}}>
+                      <div className="rk-pts-main">{loja.totalCursos}</div>
+                      <span className="rk-pts-sub">aprovados</span>
                     </div>
                   </div>
-                  <div className="rk-cell rk-progress-col">
-                    <ProgressBar pct={pct} leader={i===0}/>
-                  </div>
-                  <div className="rk-cell" style={{textAlign:'right'}}>
-                    <div className="rk-pts-main">{loja.totalCursos}</div>
-                    <span className="rk-pts-sub">aprovados</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
