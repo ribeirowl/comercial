@@ -392,7 +392,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const logoSrc     = useLogo('assets/logo.png');
-  const logoDarkSrc = useLogo('assets/logo-dark.png');
+  const logoDarkSrc = 'assets/logo-dark.png'; // logo escura: não processa canvas (tem texto branco que seria removido)
 
   // Dispatch: atualiza estado local imediatamente e sincroniza com Supabase em background
   const dispatch = action => {

@@ -330,43 +330,39 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     const eraAprovado = comp.status === 'aprovado';
     const virarAprovado = novoStatus === 'aprovado';
 
-    // aprovados ANTES desta mudança
     const vid = Number(comp.vendedorId);
+    // calcula quantos aprovados haverá APÓS esta mudança
     const prevAprov = (state.comprovantes || []).filter(c =>
       Number(c.vendedorId) === vid && c.status === 'aprovado'
     ).length;
-    const newAprov = prevAprov + (virarAprovado && !eraAprovado ? 1 : 0) + (!virarAprovado && eraAprovado ? -1 : 0);
-    const prevLotes = Math.floor(prevAprov / META_CURSOS);
-    const newLotes  = Math.floor(newAprov  / META_CURSOS);
-    const delta     = newLotes - prevLotes;
+    const newAprov = prevAprov
+      + (virarAprovado && !eraAprovado ? 1 : 0)
+      + (!virarAprovado && eraAprovado ? -1 : 0);
 
     dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:novoStatus } } });
     setEditandoCompId(null);
 
     const v = vendedores.find(x => x.id === vid);
-    if (delta > 0) {
-      for (let i = 0; i < delta; i++) _lancarPontosCurso(vid, (prevLotes + i + 1) * META_CURSOS);
-      addToast(`Meta atingida! +${ptsCurso * delta} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
-    } else if (delta < 0) {
-      // busca lançamentos criterio 9 deste vendedor, normaliza ids para Number
-      const lancsC9 = lancamentos
-        .filter(l => Number(l.vendedorId) === vid && Number(l.criterioId) === 9)
-        .sort((a,b) => new Date(b.data) - new Date(a.data));
-      const qtd = Math.abs(delta);
-      for (let i = 0; i < qtd; i++) {
-        if (lancsC9[i]) dispatch({ type:'REMOVE_LANCAMENTO', payload: Number(lancsC9[i].id) });
+    // reconciliação absoluta: lotes devidos vs lançamentos existentes
+    const lotesDevidos = Math.floor(newAprov / META_CURSOS);
+    const lancsC9 = lancamentos
+      .filter(l => Number(l.vendedorId) === vid && Number(l.criterioId) === 9)
+      .sort((a,b) => new Date(b.data) - new Date(a.data));
+    const excessos = lancsC9.length - lotesDevidos;
+
+    if (excessos > 0) {
+      // remove lançamentos mais recentes que excedam o owed
+      for (let i = 0; i < excessos; i++) {
+        dispatch({ type:'REMOVE_LANCAMENTO', payload: Number(lancsC9[i].id) });
       }
-      addToast(
-        lancsC9.length >= qtd
-          ? `Pontos revertidos para ${nomeFirst(v?.nome||'?')} (-${ptsCurso * qtd} pts).`
-          : `Status atualizado. Nenhum lançamento de curso encontrado para reverter.`,
-        'info'
-      );
+      addToast(`Pontos revertidos para ${nomeFirst(v?.nome||'?')} (-${ptsCurso * excessos} pts).`, 'info');
+    } else if (excessos < 0) {
+      // faltam lançamentos — adiciona os que estão em débito
+      const faltam = Math.abs(excessos);
+      for (let i = 0; i < faltam; i++) _lancarPontosCurso(vid, (lancsC9.length + i + 1) * META_CURSOS);
+      addToast(`Meta atingida! +${ptsCurso * faltam} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
     } else {
-      const msg = eraAprovado && !virarAprovado
-        ? `Comprovante rejeitado. Nenhum ponto a reverter (não completava lote de ${META_CURSOS}).`
-        : 'Status do comprovante atualizado.';
-      addToast(msg, 'info');
+      addToast('Status do comprovante atualizado.', 'info');
     }
   };
 
