@@ -19,6 +19,16 @@ function RankingTab({ state, dispatch, currentUser }) {
   }, [vendedores, lancamentos, criterios, config, modo]);
 
 
+  const cursosLoja = useMemo(() => {
+    const comps = state.comprovantes || [];
+    return lojas.map(loja => {
+      const vidsLoja = vendedores.filter(v => v.ativo && v.lojaId === loja.id).map(v => v.id);
+      const aprovados = comps.filter(c => c.status === 'aprovado' && vidsLoja.includes(Number(c.vendedorId)));
+      const vComCurso = new Set(aprovados.map(c => c.vendedorId)).size;
+      return { ...loja, totalCursos: aprovados.length, vAtivos: vidsLoja.length, vComCurso };
+    }).filter(l => l.vAtivos > 0).sort((a,b) => b.totalCursos - a.totalCursos);
+  }, [lojas, vendedores, state.comprovantes]);
+
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {
     const d=new Date(l.data), n=new Date();
@@ -196,6 +206,48 @@ tr.leader td.pts{color:#c9921a}
         })}
       </div>
 
+      {/* ── Ranking de cursos por unidade ── */}
+      {cursosLoja.length > 0 && (
+        <div style={{marginTop:32}}>
+          <div className="section-eyebrow" style={{marginBottom:12}}>
+            CAPACITAÇÃO · <span className="accent">CURSOS POR UNIDADE</span>
+          </div>
+          <div className="rk-table">
+            <div className="rk-header">
+              <div className="rk-cell">POS</div>
+              <div className="rk-cell">UNIDADE</div>
+              <div className="rk-cell rk-progress-col">PROGRESSO</div>
+              <div className="rk-cell" style={{textAlign:'right'}}>CURSOS</div>
+            </div>
+            {cursosLoja.map((loja, i) => {
+              const maxC = cursosLoja[0].totalCursos || 1;
+              const pct  = (loja.totalCursos / maxC) * 100;
+              return (
+                <div key={loja.id} className={`rk-row${i===0?' pos-1':''}`}>
+                  <div className="rk-cell">
+                    <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
+                  </div>
+                  <div className="rk-cell">
+                    <div className="rk-name-main">{loja.nome}</div>
+                    <div className="rk-name-sub">
+                      <span className="rk-lancamentos">{loja.vAtivos} vendedor{loja.vAtivos!==1?'es':''}</span>
+                      {loja.vComCurso > 0 && <span className="rk-lancamentos"> · {loja.vComCurso} com cursos</span>}
+                    </div>
+                  </div>
+                  <div className="rk-cell rk-progress-col">
+                    <ProgressBar pct={pct} leader={i===0}/>
+                  </div>
+                  <div className="rk-cell" style={{textAlign:'right'}}>
+                    <div className="rk-pts-main">{loja.totalCursos}</div>
+                    <span className="rk-pts-sub">aprovados</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -279,8 +331,9 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     const virarAprovado = novoStatus === 'aprovado';
 
     // aprovados ANTES desta mudança
+    const vid = Number(comp.vendedorId);
     const prevAprov = (state.comprovantes || []).filter(c =>
-      c.vendedorId === comp.vendedorId && c.status === 'aprovado'
+      Number(c.vendedorId) === vid && c.status === 'aprovado'
     ).length;
     const newAprov = prevAprov + (virarAprovado && !eraAprovado ? 1 : 0) + (!virarAprovado && eraAprovado ? -1 : 0);
     const prevLotes = Math.floor(prevAprov / META_CURSOS);
@@ -290,20 +343,30 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id:comp.id, changes:{ status:novoStatus } } });
     setEditandoCompId(null);
 
-    const v = vendedores.find(x => x.id === comp.vendedorId);
+    const v = vendedores.find(x => x.id === vid);
     if (delta > 0) {
-      for (let i = 0; i < delta; i++) _lancarPontosCurso(comp.vendedorId, (prevLotes + i + 1) * META_CURSOS);
+      for (let i = 0; i < delta; i++) _lancarPontosCurso(vid, (prevLotes + i + 1) * META_CURSOS);
       addToast(`Meta atingida! +${ptsCurso * delta} pts para ${nomeFirst(v?.nome||'?')}.`, 'success');
     } else if (delta < 0) {
-      const lancsC9 = [...lancamentos]
-        .filter(l => l.vendedorId === comp.vendedorId && l.criterioId === 9)
+      // busca lançamentos criterio 9 deste vendedor, normaliza ids para Number
+      const lancsC9 = lancamentos
+        .filter(l => Number(l.vendedorId) === vid && Number(l.criterioId) === 9)
         .sort((a,b) => new Date(b.data) - new Date(a.data));
-      for (let i = 0; i < Math.abs(delta); i++) {
-        if (lancsC9[i]) dispatch({ type:'REMOVE_LANCAMENTO', payload: lancsC9[i].id });
+      const qtd = Math.abs(delta);
+      for (let i = 0; i < qtd; i++) {
+        if (lancsC9[i]) dispatch({ type:'REMOVE_LANCAMENTO', payload: Number(lancsC9[i].id) });
       }
-      addToast(`Pontos de curso revertidos para ${nomeFirst(v?.nome||'?')}.`, 'info');
+      addToast(
+        lancsC9.length >= qtd
+          ? `Pontos revertidos para ${nomeFirst(v?.nome||'?')} (-${ptsCurso * qtd} pts).`
+          : `Status atualizado. Nenhum lançamento de curso encontrado para reverter.`,
+        'info'
+      );
     } else {
-      addToast('Status do comprovante atualizado.', 'info');
+      const msg = eraAprovado && !virarAprovado
+        ? `Comprovante rejeitado. Nenhum ponto a reverter (não completava lote de ${META_CURSOS}).`
+        : 'Status do comprovante atualizado.';
+      addToast(msg, 'info');
     }
   };
 
