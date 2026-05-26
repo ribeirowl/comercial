@@ -19,6 +19,15 @@ function RankingTab({ state, dispatch, currentUser }) {
   }, [vendedores, lancamentos, criterios, config, modo]);
 
 
+  const rankingLojas = useMemo(() => {
+    return lojas.map(loja => {
+      const vAtivos = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
+      const pg = vAtivos.reduce((s,v) => s + pontosTotal(v.id, lancamentos), 0);
+      const pm = vAtivos.reduce((s,v) => s + pontosMes(v.id, lancamentos), 0);
+      return { ...loja, pg, pm, vAtivos: vAtivos.length };
+    }).filter(l => l.vAtivos > 0).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
+  }, [lojas, vendedores, lancamentos, modo]);
+
   const cursosLoja = useMemo(() => {
     const comps = state.comprovantes || [];
     return lojas.map(loja => {
@@ -205,6 +214,49 @@ tr.leader td.pts{color:#c9921a}
           );
         })}
       </div>
+
+      {/* ── Ranking de lojas ── */}
+      {rankingLojas.length > 0 && (
+        <div style={{marginTop:32}}>
+          <div className="section-eyebrow" style={{marginBottom:12}}>
+            DESEMPENHO · <span className="accent">RANKING POR UNIDADE</span>
+          </div>
+          <div className="rk-table">
+            <div className="rk-header">
+              <div className="rk-cell">POS</div>
+              <div className="rk-cell">UNIDADE</div>
+              <div className="rk-cell rk-progress-col">PROGRESSO</div>
+              <div className="rk-cell" style={{textAlign:'right'}}>PONTOS</div>
+            </div>
+            {rankingLojas.map((loja, i) => {
+              const pts    = modo==='geral' ? loja.pg : loja.pm;
+              const maxL   = modo==='geral' ? (rankingLojas[0]?.pg||1) : (rankingLojas[0]?.pm||1);
+              const pct    = maxL > 0 ? (pts / maxL) * 100 : 0;
+              return (
+                <div key={loja.id} className={`rk-row${i===0?' pos-1':''}`}>
+                  <div className="rk-cell">
+                    <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
+                  </div>
+                  <div className="rk-cell">
+                    <div className="rk-name-main">{loja.nome}</div>
+                    <div className="rk-name-sub">
+                      <span className="rk-lancamentos">{loja.vAtivos} vendedor{loja.vAtivos!==1?'es':''}</span>
+                    </div>
+                  </div>
+                  <div className="rk-cell rk-progress-col">
+                    <ProgressBar pct={pct} leader={i===0}/>
+                    <div className="rk-pct">{Math.round(pct)}% do líder</div>
+                  </div>
+                  <div className="rk-cell" style={{textAlign:'right'}}>
+                    <div className="rk-pts-main">{pts.toLocaleString('pt-BR')}</div>
+                    {modo==='mes' && <span className="rk-pts-sub">{loja.pg.toLocaleString('pt-BR')} totais</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Ranking de cursos por unidade ── */}
       {lojas.length > 0 && (
