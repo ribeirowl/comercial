@@ -12,6 +12,7 @@ const _C2S = {
   streakAplicado:'streak_aplicado', limitesPorMes:'limites_por_mes',
   minPontos:'min_pontos', streakMultiplicador:'streak_multiplicador',
   streakSemanas:'streak_semanas',
+  canceladoPor:'cancelado_por', canceladoEm:'cancelado_em',
 };
 const _S2C = Object.fromEntries(Object.entries(_C2S).map(([k,v])=>[v,k]));
 
@@ -64,6 +65,12 @@ async function syncAction(action) {
         await _sb.from('lancamentos').insert(_toRow(action.payload)); break;
       case 'REMOVE_LANCAMENTO':
         await _sb.from('lancamentos').delete().eq('id', action.payload); break;
+      case 'CANCEL_LANCAMENTO':
+        await _sb.from('lancamentos').update(_toRow({
+          cancelado: true,
+          canceladoPor: action.payload.canceladoPor,
+          canceladoEm:  action.payload.canceladoEm,
+        })).eq('id', action.payload.id); break;
       case 'ADD_VENDEDOR':
         await _sb.from('vendedores').insert(_toRow(action.payload)); break;
       case 'UPDATE_VENDEDOR':
@@ -262,6 +269,9 @@ function reducer(state, action) {
     case 'RESET':            return SEED_STATE;
     case 'ADD_LANCAMENTO':    return { ...state, lancamentos:[...state.lancamentos, action.payload] };
     case 'REMOVE_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.filter(l=>l.id!==action.payload) };
+    case 'CANCEL_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.map(l=>
+      l.id===action.payload.id ? {...l, cancelado:true, canceladoPor:action.payload.canceladoPor, canceladoEm:action.payload.canceladoEm} : l
+    )};
     case 'ADD_VENDEDOR':    return { ...state, vendedores:[...state.vendedores, action.payload] };
     case 'UPDATE_VENDEDOR': return { ...state, vendedores:state.vendedores.map(v=>v.id===action.payload.id?{...v,...action.payload.changes}:v) };
     case 'REMOVE_VENDEDOR': return { ...state, vendedores:state.vendedores.filter(v=>v.id!==action.payload) };
@@ -309,7 +319,7 @@ function calcularStreak(vendedorId, lancamentos, criterios, streakSemanas) {
   if (!meta) return { ativo:false, semanas:0 };
   const vistos = new Map();
   lancamentos
-    .filter(l=>l.vendedorId===vendedorId && l.criterioId===meta.id)
+    .filter(l=>l.vendedorId===vendedorId && l.criterioId===meta.id && !l.cancelado)
     .forEach(l=>{ const {year,week}=getISOWeek(l.data); const k=`${year}-${String(week).padStart(2,'0')}`; if(!vistos.has(k))vistos.set(k,true); });
   const semanas = Array.from(vistos.keys()).sort().reverse();
   const now = getISOWeek(new Date());
@@ -332,14 +342,14 @@ function proximoNivel(pts, niveis) {
 }
 
 function pontosTotal(id, lancs) {
-  return lancs.filter(l=>l.vendedorId===id).reduce((s,l)=>s+l.pontos,0);
+  return lancs.filter(l=>l.vendedorId===id && !l.cancelado).reduce((s,l)=>s+l.pontos,0);
 }
 
 function pontosMes(id, lancs) {
   const n=new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===id && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return l.vendedorId===id && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).reduce((s,l)=>s+l.pontos,0);
 }
 

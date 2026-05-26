@@ -479,7 +479,7 @@ function App() {
             currentUser={currentUser}
           />
         )}
-        {tab===3 && <FeedTab state={state}/>}
+        {tab===3 && <FeedTab state={state} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
         {tab===5 && (
           <PerfilTab
             state={state}

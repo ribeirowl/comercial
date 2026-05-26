@@ -954,6 +954,30 @@ body::before {
   color: var(--ink-3); margin-top: 4px; display: block;
 }
 
+/* ── LANÇAMENTO / FEED CANCELADO ─────────────────────────────────────────── */
+.launch-row.cancelado { opacity: 0.5; }
+.launch-row.cancelado .launch-criterio,
+.launch-row.cancelado .launch-pts { text-decoration: line-through; }
+.launch-cancelled-info {
+  font-size: 10px; color: var(--ink-4);
+  font-style: italic; margin-top: 2px;
+}
+
+.feed-item.cancelado { opacity: 0.5; }
+.feed-item.cancelado .feed-item-name,
+.feed-item.cancelado .feed-pts { text-decoration: line-through; }
+.feed-cancelled-badge {
+  display: inline-block; margin-left: 6px;
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; padding: 1px 5px;
+  background: var(--ink-4); color: var(--paper);
+  border-radius: 3px; vertical-align: middle;
+}
+.feed-cancelled-by {
+  display: block; font-size: 10px;
+  color: var(--ink-4); font-style: italic; margin-top: 2px;
+}
+
 .feed-item-right { text-align: right; flex-shrink: 0; }
 .feed-pts {
   font-family: 'Anton', sans-serif;

@@ -32,9 +32,9 @@ function RankingTab({ state, dispatch, currentUser }) {
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {
     const d=new Date(l.data), n=new Date();
-    return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear() ? s+l.pontos : s;
+    return !l.cancelado&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear() ? s+l.pontos : s;
   }, 0);
-  const lancMes = lancamentos.filter(l=>{ const d=new Date(l.data),n=new Date(); return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).length;
+  const lancMes = lancamentos.filter(l=>{ const d=new Date(l.data),n=new Date(); return !l.cancelado&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).length;
 
   const exportarPDF = () => {
     const mesLabel = new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase();
@@ -834,7 +834,19 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
   );
   const [page, setPage] = useState(1);
   const [chartKey, setChartKey] = useState(0);
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const PAGE_SIZE = 8;
+  const isGerencia = currentUser?.role === 'gerencia';
+
+  const cancelarLanc = (l) => {
+    dispatch({ type:'CANCEL_LANCAMENTO', payload:{
+      id: l.id,
+      canceladoPor: currentUser.username,
+      canceladoEm:  new Date().toISOString(),
+    }});
+    setConfirmRemoveId(null);
+    addToast('Lançamento removido. Histórico mantido.', 'info');
+  };
 
   useEffect(() => {
     if (isVendedor && currentUser.vendedorId) setVid(String(currentUser.vendedorId));
@@ -861,13 +873,13 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
     const streak = calcularStreak(vendedor.id, lancamentos, criterios, config.streakSemanas);
     const pos = ranking.findIndex(v => v.id === vendedor.id) + 1;
     const lider = ranking[0]?.pm || 1;
-    const nLanc = lancamentos.filter(l => l.vendedorId === vendedor.id).length;
+    const nLanc = lancamentos.filter(l => l.vendedorId === vendedor.id && !l.cancelado).length;
 
     const months = Array.from({length:6}, (_,i) => {
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
       const pts = lancamentos.filter(l => {
         const ld = new Date(l.data);
-        return l.vendedorId===vendedor.id && ld.getMonth()===d.getMonth() && ld.getFullYear()===d.getFullYear();
+        return l.vendedorId===vendedor.id && !l.cancelado && ld.getMonth()===d.getMonth() && ld.getFullYear()===d.getFullYear();
       }).reduce((s,l) => s+l.pontos, 0);
       return {
         label: d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase(),
@@ -1012,18 +1024,32 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
               ? <EmptyState msg="Nenhum lançamento registrado."/>
               : pageLancs.map(l => {
                   const c = criterios.find(x => x.id===l.criterioId);
+                  const confirming = confirmRemoveId === l.id;
                   return (
-                    <div key={l.id} className="launch-row">
+                    <div key={l.id} className={`launch-row${l.cancelado?' cancelado':''}`}>
                       <div className="launch-info">
                         <div className="launch-criterio">{c?.nome||'?'}</div>
                         {l.obs && <div className="launch-obs">"{l.obs}"</div>}
                         {l.streakAplicado && <span className="streak-tag">×{state.config.streakMultiplicador} streak</span>}
+                        {l.cancelado && (
+                          <div className="launch-cancelled-info">
+                            Removido por {l.canceladoPor} · {fmtData(l.canceladoEm)}
+                          </div>
+                        )}
                       </div>
                       <div className="launch-right">
                         <span className={`launch-pts${c?.tipo==='negativo'?' negativo':''}`}>
                           {c?.tipo==='negativo'?'−':'+'}{l.pontos}
                         </span>
                         <span className="launch-date">{fmtData(l.data)}</span>
+                        {isGerencia && !l.cancelado && (
+                          confirming
+                            ? <div style={{display:'flex',gap:4,marginTop:4}}>
+                                <button className="btn-danger" style={{padding:'3px 8px',fontSize:10}} onClick={()=>cancelarLanc(l)}>Confirmar</button>
+                                <button className="btn-ghost" style={{padding:'3px 8px',fontSize:10}} onClick={()=>setConfirmRemoveId(null)}>Cancelar</button>
+                              </div>
+                            : <button className="btn-ghost" style={{padding:'3px 8px',fontSize:10,marginTop:4,color:'var(--ink-3)'}} onClick={()=>setConfirmRemoveId(l.id)}>Remover</button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1052,10 +1078,22 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
 }
 
 // ── FEED TAB ──────────────────────────────────────────────────────────────────
-function FeedTab({ state }) {
+function FeedTab({ state, dispatch, addToast, currentUser }) {
   const { vendedores, lancamentos, criterios } = state;
   const [fVend, setFVend] = useState('');
   const [fCrit, setFCrit] = useState('');
+  const [confirmRemoveFeed, setConfirmRemoveFeed] = useState(null);
+  const isGerencia = currentUser?.role === 'gerencia';
+
+  const cancelarLancFeed = (l) => {
+    dispatch({ type:'CANCEL_LANCAMENTO', payload:{
+      id: l.id,
+      canceladoPor: currentUser.username,
+      canceladoEm:  new Date().toISOString(),
+    }});
+    setConfirmRemoveFeed(null);
+    addToast('Lançamento removido. Histórico mantido.', 'info');
+  };
 
   const filtered = useMemo(() => {
     return [...lancamentos]
@@ -1111,22 +1149,37 @@ function FeedTab({ state }) {
           {items.map(l => {
             const v = vendedores.find(x=>x.id===l.vendedorId);
             const c = criterios.find(x=>x.id===l.criterioId);
+            const confirming = confirmRemoveFeed === l.id;
             return (
-              <div key={l.id} className="feed-item">
+              <div key={l.id} className={`feed-item${l.cancelado?' cancelado':''}`}>
                 <Avatar nome={v?.nome||'?'} size={36} foto={v?.foto}/>
                 <div className="feed-item-info">
                   <div>
                     <span className="feed-item-name">{v?.nome||'?'}</span>
                     <span className="feed-item-crit">· {c?.nome}</span>
-                    {l.streakAplicado && <StreakBadge semanas={state.config.streakSemanas}/>}
+                    {l.streakAplicado && !l.cancelado && <StreakBadge semanas={state.config.streakSemanas}/>}
+                    {l.cancelado && <span className="feed-cancelled-badge">removido</span>}
                   </div>
                   {l.obs && <span className="feed-item-obs">"{l.obs}"</span>}
+                  {l.cancelado && (
+                    <span className="feed-cancelled-by">
+                      por {l.canceladoPor} · {fmtData(l.canceladoEm)}
+                    </span>
+                  )}
                 </div>
                 <div className="feed-item-right">
                   <div className={`feed-pts${c?.tipo==='negativo'?' negativo':''}`}>
                     {c?.tipo==='negativo'?'−':'+'}{l.pontos}
                   </div>
                   <span className="feed-rel">{fmtRel(l.data)}</span>
+                  {isGerencia && !l.cancelado && (
+                    confirming
+                      ? <div style={{display:'flex',gap:4,marginTop:4,justifyContent:'flex-end'}}>
+                          <button className="btn-danger" style={{padding:'3px 8px',fontSize:10}} onClick={()=>cancelarLancFeed(l)}>Confirmar</button>
+                          <button className="btn-ghost" style={{padding:'3px 8px',fontSize:10}} onClick={()=>setConfirmRemoveFeed(null)}>×</button>
+                        </div>
+                      : <button className="btn-ghost" style={{padding:'3px 8px',fontSize:10,marginTop:4,color:'var(--ink-3)'}} onClick={()=>setConfirmRemoveFeed(l.id)}>Remover</button>
+                  )}
                 </div>
               </div>
             );
