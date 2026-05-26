@@ -22,9 +22,10 @@ function RankingTab({ state, dispatch, currentUser }) {
   const rankingLojas = useMemo(() => {
     return lojas.map(loja => {
       const vAtivos = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
+      const n = vAtivos.length || 1;
       const pg = vAtivos.reduce((s,v) => s + pontosTotal(v.id, lancamentos), 0);
       const pm = vAtivos.reduce((s,v) => s + pontosMes(v.id, lancamentos), 0);
-      return { ...loja, pg, pm, vAtivos: vAtivos.length };
+      return { ...loja, pg: Math.round(pg/n), pm: Math.round(pm/n), vAtivos: vAtivos.length };
     }).filter(l => l.vAtivos > 0).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
   }, [lojas, vendedores, lancamentos, modo]);
 
@@ -220,13 +221,14 @@ tr.leader td.pts{color:#c9921a}
         <div style={{marginTop:32}}>
           <div className="section-eyebrow" style={{marginBottom:12}}>
             DESEMPENHO · <span className="accent">RANKING POR UNIDADE</span>
+            <span style={{marginLeft:8,fontSize:10,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace',fontWeight:400,letterSpacing:0}}>média por vendedor</span>
           </div>
           <div className="rk-table">
             <div className="rk-header">
               <div className="rk-cell">POS</div>
               <div className="rk-cell">UNIDADE</div>
               <div className="rk-cell rk-progress-col">PROGRESSO</div>
-              <div className="rk-cell" style={{textAlign:'right'}}>PONTOS</div>
+              <div className="rk-cell" style={{textAlign:'right'}}>MÉD. PTS</div>
             </div>
             {rankingLojas.map((loja, i) => {
               const pts    = modo==='geral' ? loja.pg : loja.pm;
@@ -249,7 +251,7 @@ tr.leader td.pts{color:#c9921a}
                   </div>
                   <div className="rk-cell" style={{textAlign:'right'}}>
                     <div className="rk-pts-main">{pts.toLocaleString('pt-BR')}</div>
-                    {modo==='mes' && <span className="rk-pts-sub">{loja.pg.toLocaleString('pt-BR')} totais</span>}
+                    {modo==='mes' && <span className="rk-pts-sub">{loja.pg.toLocaleString('pt-BR')} geral</span>}
                   </div>
                 </div>
               );
