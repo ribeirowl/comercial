@@ -357,7 +357,7 @@ function countNoMes(vid, cid, lancs) {
   const n=new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===vid && l.criterioId===cid && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).length;
 }
 
