@@ -93,6 +93,17 @@ function CriteriosSubtab({ state, dispatch, addToast }) {
     addToast(`Critério removido.`,'info');
   };
 
+  const sorted = [...criterios].sort((a,b) => (a.ordem??a.id) - (b.ordem??b.id));
+
+  const mover = (idx, dir) => {
+    const target = idx + dir;
+    if (target < 0 || target >= sorted.length) return;
+    const a = sorted[idx], b = sorted[target];
+    const oa = a.ordem ?? idx, ob = b.ordem ?? target;
+    dispatch({ type:'UPDATE_CRITERIO', payload:{ id: a.id, field:'ordem', value: ob }});
+    dispatch({ type:'UPDATE_CRITERIO', payload:{ id: b.id, field:'ordem', value: oa }});
+  };
+
   const adicionar = () => {
     if(!novoNome.trim()) { setErro('Informe o nome do critério.'); return; }
     if(!novoPts || Number(novoPts)<=0) { setErro('Informe os pontos.'); return; }
@@ -109,6 +120,7 @@ function CriteriosSubtab({ state, dispatch, addToast }) {
     <div>
       <div className="criteria-table">
         <div className="criteria-header">
+          <div></div>
           <div>Critério</div>
           <div style={{textAlign:'center'}}>Pontos</div>
           <div style={{textAlign:'center'}}>Tipo</div>
@@ -116,9 +128,13 @@ function CriteriosSubtab({ state, dispatch, addToast }) {
           <div style={{textAlign:'center'}}>Lim/mês</div>
           <div></div>
         </div>
-        {criterios.length===0 && <EmptyState msg="Nenhum critério cadastrado."/>}
-        {criterios.map(c=>(
+        {sorted.length===0 && <EmptyState msg="Nenhum critério cadastrado."/>}
+        {sorted.map((c, idx)=>(
           <div key={c.id} className="criteria-row">
+            <div className="criteria-order-btns">
+              <button className="order-btn" onClick={()=>mover(idx,-1)} disabled={idx===0} title="Mover para cima">▲</button>
+              <button className="order-btn" onClick={()=>mover(idx,1)} disabled={idx===sorted.length-1} title="Mover para baixo">▼</button>
+            </div>
             <input
               className="inline-input"
               value={c.nome}
@@ -342,7 +358,6 @@ function UsuariosSubtab({ state, dispatch, addToast, currentUser }) {
     if (!password) { setErro('Informe uma senha.'); return; }
     if (role === 'vendedor' && !nome) { setErro('Informe o nome completo do vendedor.'); return; }
     if (role === 'vendedor' && !lojaEfetiva) { setErro('Selecione a loja do vendedor.'); return; }
-    if (role === 'gerencia' && isSuperAdmin && !lojaId) { setErro('Selecione a loja (ou crie como super-admin deixando vazio — não suportado aqui).'); return; }
     if (usuarios.some(x => x.username.toLowerCase() === u.toLowerCase())) {
       setErro('Já existe um usuário com esse nome.'); return;
     }

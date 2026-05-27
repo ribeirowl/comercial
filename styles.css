@@ -1048,7 +1048,7 @@ body::before {
 
 .criteria-header, .criteria-row {
   display: grid;
-  grid-template-columns: 1fr 70px 80px 80px 70px 36px;
+  grid-template-columns: 36px 1fr 70px 80px 80px 70px 36px;
   gap: 8px; align-items: center;
   padding: calc(9px * var(--density)) 4px;
   border-bottom: 1px solid var(--rule);
@@ -1062,6 +1062,15 @@ body::before {
 }
 
 .criteria-row:hover { background: var(--paper-2); }
+
+.criteria-order-btns { display: flex; flex-direction: column; gap: 1px; }
+.order-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-3); font-size: 8px; padding: 1px 4px; line-height: 1;
+  border-radius: 2px; transition: color .15s, background .15s;
+}
+.order-btn:hover:not(:disabled) { color: var(--ink); background: var(--paper-3); }
+.order-btn:disabled { opacity: 0.2; cursor: default; }
 
 .inline-input {
   background: transparent; border: none;
