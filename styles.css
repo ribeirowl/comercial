@@ -958,10 +958,11 @@ body::before {
 .launch-row.cancelado { opacity: 0.5; }
 .launch-row.cancelado .launch-criterio,
 .launch-row.cancelado .launch-pts { text-decoration: line-through; }
-.launch-cancelled-info {
+.launch-meta-info {
   font-size: 10px; color: var(--ink-4);
   font-style: italic; margin-top: 2px;
 }
+.launch-cancelled-info { color: var(--brand-red); }
 
 .feed-item.cancelado { opacity: 0.5; }
 .feed-item.cancelado .feed-item-name,
@@ -973,10 +974,11 @@ body::before {
   background: var(--ink-4); color: var(--paper);
   border-radius: 3px; vertical-align: middle;
 }
-.feed-cancelled-by {
+.feed-meta-info {
   display: block; font-size: 10px;
   color: var(--ink-4); font-style: italic; margin-top: 2px;
 }
+.feed-cancelled-by { color: var(--brand-red); }
 
 .feed-item-right { text-align: right; flex-shrink: 0; }
 .feed-pts {

@@ -359,6 +359,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
       id: newId, vendedorId, criterioId: 9,
       pontos: ptsCurso, obs: `Meta de ${META_CURSOS} cursos atingida (${totalAprovados} aprovados).`,
       data: new Date().toISOString(), streakAplicado: false,
+      lancadoPor: currentUser?.username || null,
     }});
   };
 
@@ -470,6 +471,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
           id: maxId, vendedorId: Number(vid), criterioId: c.id,
           pontos: pts, obs: obs.trim(),
           data: new Date().toISOString(), streakAplicado: bonus,
+          lancadoPor: currentUser?.username || null,
         }});
       });
       setLoading(false); setSuccess(true);
@@ -1085,11 +1087,12 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
                         <div className="launch-criterio">{c?.nome||'?'}</div>
                         {l.obs && <div className="launch-obs">"{l.obs}"</div>}
                         {l.streakAplicado && <span className="streak-tag">×{state.config.streakMultiplicador} streak</span>}
-                        {l.cancelado && (
-                          <div className="launch-cancelled-info">
-                            Removido por {l.canceladoPor} · {fmtData(l.canceladoEm)}
-                          </div>
-                        )}
+                        <div className="launch-meta-info">
+                          {l.lancadoPor && <span>Lançado por {l.lancadoPor}</span>}
+                          {l.cancelado && (
+                            <span className="launch-cancelled-info"> · Removido por {l.canceladoPor} · {fmtData(l.canceladoEm)}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="launch-right">
                         <span className={`launch-pts${c?.tipo==='negativo'?' negativo':''}`}>
@@ -1215,11 +1218,12 @@ function FeedTab({ state, dispatch, addToast, currentUser }) {
                     {l.cancelado && <span className="feed-cancelled-badge">removido</span>}
                   </div>
                   {l.obs && <span className="feed-item-obs">"{l.obs}"</span>}
-                  {l.cancelado && (
-                    <span className="feed-cancelled-by">
-                      por {l.canceladoPor} · {fmtData(l.canceladoEm)}
-                    </span>
-                  )}
+                  <span className="feed-meta-info">
+                    {l.lancadoPor && <span>por {l.lancadoPor}</span>}
+                    {l.cancelado && (
+                      <span className="feed-cancelled-by"> · removido por {l.canceladoPor} · {fmtData(l.canceladoEm)}</span>
+                    )}
+                  </span>
                 </div>
                 <div className="feed-item-right">
                   <div className={`feed-pts${c?.tipo==='negativo'?' negativo':''}`}>
