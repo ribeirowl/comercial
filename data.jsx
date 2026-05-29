@@ -362,6 +362,15 @@ function countNoMes(vid, cid, lancs) {
   }).length;
 }
 
+// Soma pontos usados no mês para um critério parcial (não conta lançamentos, soma pontos)
+function pontosNoCriterioMes(vid, cid, lancs) {
+  const n=new Date();
+  return lancs.filter(l=>{
+    const d=new Date(l.data);
+    return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+  }).reduce((s,l)=>s+l.pontos,0);
+}
+
 function fmtData(iso) {
   return new Date(iso).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});
 }
@@ -403,6 +412,7 @@ window.proximoNivel        = proximoNivel;
 window.pontosTotal         = pontosTotal;
 window.pontosMes           = pontosMes;
 window.countNoMes          = countNoMes;
+window.pontosNoCriterioMes = pontosNoCriterioMes;
 window.fmtData             = fmtData;
 window.fmtDataLonga        = fmtDataLonga;
 window.fmtRel              = fmtRel;
