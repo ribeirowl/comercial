@@ -464,12 +464,17 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         const isMetaSemanal = c.nome === 'Meta semanal atingida';
         const bonus = streak.ativo && isMetaSemanal;
         let pts = c.modo === 'simnao' ? c.pontos : Number(r.pts);
-        // blindagem: não ultrapassar o limite mensal de pontos para modo parcial
-        if (c.modo === 'parcial' && c.limitesPorMes > 0) {
-          const usado = pontosNoCriterioMes(Number(vid), c.id, lancamentos);
-          const restante = c.limitesPorMes - usado;
-          if (restante <= 0) return; // esgotado, pula
-          pts = Math.min(pts, restante);
+        // blindagem: respeitar limite mensal conforme tipoLimite
+        if (c.limitesPorMes > 0) {
+          if (c.tipoLimite === 'pontos' && c.modo === 'parcial') {
+            const usado = pontosNoCriterioMes(Number(vid), c.id, lancamentos);
+            const restante = c.limitesPorMes - usado;
+            if (restante <= 0) return;
+            pts = Math.min(pts, restante);
+          } else {
+            const usado = countNoMes(Number(vid), c.id, lancamentos);
+            if (usado >= c.limitesPorMes) return;
+          }
         }
         if (bonus) pts = Math.round(pts * config.streakMultiplicador);
         total += pts;
@@ -617,8 +622,9 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
               <div className="lanc-lista">
                 {criterios.filter(c => !c.oculto).map(c => {
                   const r = resps[c.id] || {};
+                  const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
                   const usadoMes = c.limitesPorMes > 0
-                    ? (c.modo === 'parcial'
+                    ? (usarPontos
                         ? pontosNoCriterioMes(Number(vid), c.id, lancamentos)
                         : countNoMes(Number(vid), c.id, lancamentos))
                     : 0;
@@ -647,7 +653,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                             <span style={{color: esgotado?'var(--brand-red)':'var(--ink-4)'}}>
                               {esgotado
                                 ? ' · limite atingido'
-                                : ` · ${limRest} ${c.modo==='parcial'?'pts restantes':'restante(s)'}`}
+                                : ` · ${limRest} ${usarPontos ? 'pts restantes' : `vez${limRest!==1?'es':''} restante${limRest!==1?'s':''}`}`}
                             </span>
                           )}
                         </div>
@@ -671,14 +677,14 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                             <input
                               className="inline-input-num"
                               type="number"
-                              value={r.pts ?? String(Math.min(c.pontos, limRest ?? c.pontos))}
+                              value={r.pts ?? String(c.pontos)}
                               onChange={e => setPts(c.id, e.target.value)}
                               min="1"
-                              max={limRest ?? undefined}
+                              max={usarPontos && limRest !== null ? limRest : undefined}
                               style={{width:70}}
                             />
                             <span style={{fontSize:11,color:'var(--ink-3)',fontFamily:'JetBrains Mono,monospace'}}>
-                              pts{limRest !== null ? ` / ${limRest}` : ''}
+                              pts{usarPontos && limRest !== null ? ` / ${limRest}` : ''}
                             </span>
                           </div>
                         )}

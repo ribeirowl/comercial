@@ -170,13 +170,28 @@ function CriteriosSubtab({ state, dispatch, addToast }) {
                 </button>
               ))}
             </div>
-            <input
-              className="inline-input-num"
-              type="number"
-              value={c.limitesPorMes}
-              onChange={e=>update(c.id,'limitesPorMes',Number(e.target.value))}
-              min="0"
-            />
+            <div style={{display:'flex',flexDirection:'column',gap:3,alignItems:'center'}}>
+              <input
+                className="inline-input-num"
+                type="number"
+                value={c.limitesPorMes}
+                onChange={e=>update(c.id,'limitesPorMes',Number(e.target.value))}
+                min="0"
+                style={{width:'100%'}}
+              />
+              {c.modo==='parcial' && c.limitesPorMes>0 && (
+                <div style={{display:'flex',gap:2}}>
+                  {[['lancamentos','×'],['pontos','pts']].map(([t,l])=>(
+                    <button key={t}
+                      className={`toggle-btn${(c.tipoLimite||'lancamentos')===t?' active-modo':''}`}
+                      style={{padding:'1px 5px',fontSize:9}}
+                      onClick={()=>update(c.id,'tipoLimite',t)}
+                      title={t==='lancamentos'?'Limite por número de lançamentos':'Limite por pontos totais'}
+                    >{l}</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="btn-danger" onClick={()=>remover(c)} title="Remover">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>

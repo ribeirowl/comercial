@@ -13,7 +13,7 @@ const _C2S = {
   minPontos:'min_pontos', streakMultiplicador:'streak_multiplicador',
   streakSemanas:'streak_semanas',
   canceladoPor:'cancelado_por', canceladoEm:'cancelado_em',
-  lancadoPor:'lancado_por',
+  lancadoPor:'lancado_por', tipoLimite:'tipo_limite',
 };
 const _S2C = Object.fromEntries(Object.entries(_C2S).map(([k,v])=>[v,k]));
 
