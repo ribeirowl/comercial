@@ -444,11 +444,21 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
   };
 
   const prontos = criterios.filter(c => !c.oculto).filter(c => {
-    const r = resps[c.id];
-    if (!r) return false;
-    if (c.modo === 'simnao')  return r.simNao === 'sim';
-    if (c.modo === 'parcial') return Number(r.pts) > 0;
-    return false;
+    const r = resps[c.id] || {};
+    // verificar se foi selecionado
+    const selecionado = c.modo === 'simnao'  ? r.simNao === 'sim'
+                      : c.modo === 'parcial' ? Number(r.pts) > 0
+                      : false;
+    if (!selecionado) return false;
+    // excluir se esgotado (limite mensal atingido)
+    if (vid && c.limitesPorMes > 0) {
+      const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
+      const usado = usarPontos
+        ? pontosNoCriterioMes(Number(vid), c.id, lancamentos)
+        : countNoMes(Number(vid), c.id, lancamentos);
+      if (usado >= c.limitesPorMes) return false;
+    }
+    return true;
   });
 
   const handleLancar = () => {
