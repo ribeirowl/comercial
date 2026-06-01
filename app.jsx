@@ -508,7 +508,7 @@ function App() {
       )}
 
       <main className="main-col">
-        {tab===0 && <RankingTab  state={stateView} dispatch={dispatch} currentUser={currentUser}/>}
+        {tab===0 && <RankingTab  state={stateView} dispatch={dispatch} currentUser={currentUser} viewDate={viewDate}/>}
         {tab===1 && <LancarTab   state={state}     dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
         {tab===2 && (
           <VendedorTab
@@ -516,6 +516,7 @@ function App() {
             dispatch={dispatch}
             addToast={addToast}
             currentUser={currentUser}
+            viewDate={viewDate}
           />
         )}
         {tab===3 && <FeedTab state={stateView} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}

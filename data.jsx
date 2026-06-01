@@ -346,8 +346,8 @@ function pontosTotal(id, lancs) {
   return lancs.filter(l=>l.vendedorId===id && !l.cancelado).reduce((s,l)=>s+l.pontos,0);
 }
 
-function pontosMes(id, lancs) {
-  const n=new Date();
+function pontosMes(id, lancs, refDate) {
+  const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
     return l.vendedorId===id && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();

@@ -2,21 +2,22 @@
 const { useState, useMemo, useEffect, useRef } = React;
 
 // ── RANKING TAB ───────────────────────────────────────────────────────────────
-function RankingTab({ state, dispatch, currentUser }) {
+function RankingTab({ state, dispatch, currentUser, viewDate }) {
   const { vendedores, lancamentos, criterios, config } = state;
   const [modo, setModo] = useState('mes');
   const lojas = state.lojas || [];
+  const refDate = viewDate ? new Date(viewDate + 'T12:00:00') : new Date();
 
   const ranking = useMemo(() => {
     return vendedores.filter(v=>v.ativo).map(v => ({
       ...v,
       pg: pontosTotal(v.id, lancamentos),
-      pm: pontosMes(v.id, lancamentos),
+      pm: pontosMes(v.id, lancamentos, refDate),
       nivel: calcularNivel(pontosTotal(v.id, lancamentos), config.niveis),
       streak: calcularStreak(v.id, lancamentos, criterios, config.streakSemanas),
-      nLanc: lancamentos.filter(l=>l.vendedorId===v.id).length,
+      nLanc: lancamentos.filter(l=>l.vendedorId===v.id&&!l.cancelado).length,
     })).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
-  }, [vendedores, lancamentos, criterios, config, modo]);
+  }, [vendedores, lancamentos, criterios, config, modo, viewDate]);
 
 
   const rankingLojas = useMemo(() => {
@@ -24,10 +25,10 @@ function RankingTab({ state, dispatch, currentUser }) {
       const vAtivos = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
       const n = vAtivos.length || 1;
       const pg = vAtivos.reduce((s,v) => s + pontosTotal(v.id, lancamentos), 0);
-      const pm = vAtivos.reduce((s,v) => s + pontosMes(v.id, lancamentos), 0);
+      const pm = vAtivos.reduce((s,v) => s + pontosMes(v.id, lancamentos, refDate), 0);
       return { ...loja, pg: Math.round(pg/n), pm: Math.round(pm/n), vAtivos: vAtivos.length };
     }).filter(l => l.vAtivos > 0).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
-  }, [lojas, vendedores, lancamentos, modo]);
+  }, [lojas, vendedores, lancamentos, modo, viewDate]);
 
   const cursosVendedor = useMemo(() => {
     const comps = state.comprovantes || [];
@@ -40,10 +41,10 @@ function RankingTab({ state, dispatch, currentUser }) {
 
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {
-    const d=new Date(l.data), n=new Date();
-    return !l.cancelado&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear() ? s+l.pontos : s;
+    const d=new Date(l.data);
+    return !l.cancelado&&d.getMonth()===refDate.getMonth()&&d.getFullYear()===refDate.getFullYear() ? s+l.pontos : s;
   }, 0);
-  const lancMes = lancamentos.filter(l=>{ const d=new Date(l.data),n=new Date(); return !l.cancelado&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear(); }).length;
+  const lancMes = lancamentos.filter(l=>{ const d=new Date(l.data); return !l.cancelado&&d.getMonth()===refDate.getMonth()&&d.getFullYear()===refDate.getFullYear(); }).length;
 
   const exportarPDF = () => {
     const mesLabel = new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase();
@@ -136,7 +137,7 @@ tr.leader td.pts{color:#c9921a}
     win.document.close();
   };
 
-  const mesLabel = new Date().toLocaleDateString('pt-BR',{month:'long'}).toUpperCase();
+  const mesLabel = refDate.toLocaleDateString('pt-BR',{month:'long'}).toUpperCase();
 
   return (
     <div>
@@ -924,9 +925,10 @@ function ComprovantesSection({ vendedorId, state, dispatch, addToast }) {
 }
 
 // ── VENDEDOR TAB ──────────────────────────────────────────────────────────────
-function VendedorTab({ state, dispatch, addToast, currentUser }) {
+function VendedorTab({ state, dispatch, addToast, currentUser, viewDate }) {
   const { vendedores, lancamentos, criterios, config } = state;
   const isVendedor = currentUser?.role === 'vendedor';
+  const refDate = viewDate ? new Date(viewDate + 'T12:00:00') : new Date();
   // Para o dropdown de seleção, gerente local só vê sua loja
   const vendedoresDropdown = (currentUser?.role === 'gerencia' && currentUser?.lojaId)
     ? vendedores.filter(v => v.lojaId === currentUser.lojaId)
@@ -962,7 +964,7 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
   const ranking = useMemo(() => {
     return vendedores.filter(v=>v.ativo).map(v=>({
       ...v,
-      pm: pontosMes(v.id, lancamentos),
+      pm: pontosMes(v.id, lancamentos, refDate),
       pg: pontosTotal(v.id, lancamentos),
     })).sort((a,b) => b.pm-a.pm);
   }, [vendedores, lancamentos]);
@@ -970,7 +972,7 @@ function VendedorTab({ state, dispatch, addToast, currentUser }) {
   const vData = useMemo(() => {
     if (!vendedor) return null;
     const pg = pontosTotal(vendedor.id, lancamentos);
-    const pm = pontosMes(vendedor.id, lancamentos);
+    const pm = pontosMes(vendedor.id, lancamentos, refDate);
     const nivel = calcularNivel(pg, config.niveis);
     const proximo = proximoNivel(pg, config.niveis);
     const streak = calcularStreak(vendedor.id, lancamentos, criterios, config.streakSemanas);
