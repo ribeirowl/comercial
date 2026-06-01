@@ -29,15 +29,14 @@ function RankingTab({ state, dispatch, currentUser }) {
     }).filter(l => l.vAtivos > 0).sort((a,b) => modo==='geral' ? b.pg-a.pg : b.pm-a.pm);
   }, [lojas, vendedores, lancamentos, modo]);
 
-  const cursosLoja = useMemo(() => {
+  const cursosVendedor = useMemo(() => {
     const comps = state.comprovantes || [];
-    return lojas.map(loja => {
-      const vidsLoja = vendedores.filter(v => v.ativo && (v.lojaId === loja.id || Number(v.lojaId) === Number(loja.id))).map(v => v.id);
-      const aprovados = comps.filter(c => c.status === 'aprovado' && vidsLoja.includes(Number(c.vendedorId)));
-      const vComCurso = new Set(aprovados.map(c => c.vendedorId)).size;
-      return { ...loja, totalCursos: aprovados.length, vAtivos: vidsLoja.length, vComCurso };
-    }).filter(l => l.totalCursos > 0).sort((a,b) => b.totalCursos - a.totalCursos);
-  }, [lojas, vendedores, state.comprovantes]);
+    return vendedores.filter(v => v.ativo).map(v => {
+      const aprovados = comps.filter(c => c.status === 'aprovado' && Number(c.vendedorId) === v.id).length;
+      const loja = lojas.find(l => Number(l.id) === Number(v.lojaId));
+      return { ...v, totalCursos: aprovados, lojaNome: loja?.nome || '—' };
+    }).filter(v => v.totalCursos > 0).sort((a,b) => b.totalCursos - a.totalCursos);
+  }, [vendedores, lojas, state.comprovantes]);
 
   const maxPts = ranking[0] ? (modo==='geral' ? ranking[0].pg : ranking[0].pm) : 1;
   const totalPtsmes = lancamentos.reduce((s,l) => {
@@ -260,51 +259,48 @@ tr.leader td.pts{color:#c9921a}
         </div>
       )}
 
-      {/* ── Ranking de cursos por unidade ── */}
-      {lojas.length > 0 && (
-        <div style={{marginTop:32}}>
-          <div className="section-eyebrow" style={{marginBottom:12}}>
-            CAPACITAÇÃO · <span className="accent">CURSOS POR UNIDADE</span>
-          </div>
-          {cursosLoja.length === 0 ? (
-            <EmptyState msg="Nenhum comprovante de curso aprovado ainda." />
-          ) : (
-            <div className="rk-table">
-              <div className="rk-header">
-                <div className="rk-cell">POS</div>
-                <div className="rk-cell">UNIDADE</div>
-                <div className="rk-cell rk-progress-col">PROGRESSO</div>
-                <div className="rk-cell" style={{textAlign:'right'}}>CURSOS</div>
-              </div>
-              {cursosLoja.map((loja, i) => {
-                const maxC = cursosLoja[0].totalCursos || 1;
-                const pct  = (loja.totalCursos / maxC) * 100;
-                return (
-                  <div key={loja.id} className={`rk-row${i===0?' pos-1':''}`}>
-                    <div className="rk-cell">
-                      <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
-                    </div>
-                    <div className="rk-cell">
-                      <div className="rk-name-main">{loja.nome}</div>
-                      <div className="rk-name-sub">
-                        <span className="rk-lancamentos">{loja.vAtivos} vendedor{loja.vAtivos!==1?'es':''}</span>
-                        {loja.vComCurso > 0 && <span className="rk-lancamentos"> · {loja.vComCurso} com cursos</span>}
-                      </div>
-                    </div>
-                    <div className="rk-cell rk-progress-col">
-                      <ProgressBar pct={pct} leader={i===0}/>
-                    </div>
-                    <div className="rk-cell" style={{textAlign:'right'}}>
-                      <div className="rk-pts-main">{loja.totalCursos}</div>
-                      <span className="rk-pts-sub">aprovados</span>
+      {/* ── Ranking de cursos por vendedor ── */}
+      <div style={{marginTop:32}}>
+        <div className="section-eyebrow" style={{marginBottom:12}}>
+          CAPACITAÇÃO · <span className="accent">CURSOS POR VENDEDOR</span>
+        </div>
+        {cursosVendedor.length === 0 ? (
+          <EmptyState msg="Nenhum comprovante de curso aprovado ainda." />
+        ) : (
+          <div className="rk-table">
+            <div className="rk-header">
+              <div className="rk-cell">POS</div>
+              <div className="rk-cell">VENDEDOR</div>
+              <div className="rk-cell rk-progress-col">PROGRESSO</div>
+              <div className="rk-cell" style={{textAlign:'right'}}>CURSOS</div>
+            </div>
+            {cursosVendedor.map((v, i) => {
+              const maxC = cursosVendedor[0].totalCursos || 1;
+              const pct  = (v.totalCursos / maxC) * 100;
+              return (
+                <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}>
+                  <div className="rk-cell">
+                    <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
+                  </div>
+                  <div className="rk-cell">
+                    <div className="rk-name-main">{v.nome}</div>
+                    <div className="rk-name-sub">
+                      <span className="rk-lancamentos">{v.lojaNome}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  <div className="rk-cell rk-progress-col">
+                    <ProgressBar pct={pct} leader={i===0}/>
+                  </div>
+                  <div className="rk-cell" style={{textAlign:'right'}}>
+                    <div className="rk-pts-main">{v.totalCursos}</div>
+                    <span className="rk-pts-sub">aprovados</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
     </div>
   );
@@ -554,61 +550,6 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         </div>
       )}
 
-      {/* ── Comprovantes já analisados (com edição) ── */}
-      {(() => {
-        const analisados = (state.comprovantes||[]).filter(c =>
-          (c.status==='aprovado'||c.status==='rejeitado') && vidsVisiveis.has(c.vendedorId)
-        ).sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,20);
-        if (!analisados.length) return null;
-        return (
-          <div className="comp-pendentes-block" style={{marginTop:16}}>
-            <div className="section-eyebrow" style={{marginBottom:12}}>
-              ANALISADOS · <span className="accent">ÚLTIMOS {analisados.length}</span>
-            </div>
-            {analisados.map(comp => {
-              const v = vendedores.find(x=>x.id===comp.vendedorId);
-              const st = comp.status;
-              const editando = editandoCompId === comp.id;
-              return (
-                <div key={comp.id} className="comp-pending-row" style={{opacity:0.85}}>
-                  <div className="comp-pending-icon" style={{color:st==='aprovado'?'#2d7d2d':'#cc1111'}}>
-                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                      {st==='aprovado'
-                        ? <path d="M4 10l5 5 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        : <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      }
-                    </svg>
-                  </div>
-                  <div className="comp-pending-info">
-                    <div className="comp-pending-nome">{comp.nome}</div>
-                    <div className="comp-pending-meta">
-                      <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
-                      <span>{v?.nome||'?'}</span>
-                      <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
-                      <span className={`comp-status-badge ${st}`} style={{marginLeft:4}}>
-                        {st==='aprovado'?'Aprovado':'Rejeitado'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="comp-pending-actions">
-                    <button className="comp-view-btn" onClick={()=>verComp(comp)}>Ver</button>
-                    {editando ? (
-                      <>
-                        <button className="btn-aprovar" style={{fontSize:11}} onClick={()=>editarStatus(comp,'aprovado')}>Aprovado</button>
-                        <button className="btn-danger" style={{padding:'5px 10px',fontSize:11}} onClick={()=>editarStatus(comp,'rejeitado')}>Rejeitado</button>
-                        <button className="btn-ghost" style={{padding:'5px 10px',fontSize:11}} onClick={()=>setEditandoCompId(null)}>Cancelar</button>
-                      </>
-                    ) : (
-                      <button className="btn-ghost" style={{padding:'5px 12px',fontSize:11}} onClick={()=>setEditandoCompId(comp.id)}>Editar</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
       <div className="lancar-grid">
         <div className="form-block">
           <FieldSelect label="Vendedor" value={vid} onChange={trocarVendedor} placeholder="Selecione um vendedor...">
@@ -744,6 +685,61 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
           }
         </div>
       </div>
+
+      {/* ── Comprovantes já analisados (com edição) ── */}
+      {(() => {
+        const analisados = (state.comprovantes||[]).filter(c =>
+          (c.status==='aprovado'||c.status==='rejeitado') && vidsVisiveis.has(c.vendedorId)
+        ).sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,20);
+        if (!analisados.length) return null;
+        return (
+          <div className="comp-pendentes-block" style={{marginTop:24}}>
+            <div className="section-eyebrow" style={{marginBottom:12}}>
+              ANALISADOS · <span className="accent">ÚLTIMOS {analisados.length}</span>
+            </div>
+            {analisados.map(comp => {
+              const v = vendedores.find(x=>x.id===comp.vendedorId);
+              const st = comp.status;
+              const editando = editandoCompId === comp.id;
+              return (
+                <div key={comp.id} className="comp-pending-row" style={{opacity:0.85}}>
+                  <div className="comp-pending-icon" style={{color:st==='aprovado'?'#2d7d2d':'#cc1111'}}>
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      {st==='aprovado'
+                        ? <path d="M4 10l5 5 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        : <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      }
+                    </svg>
+                  </div>
+                  <div className="comp-pending-info">
+                    <div className="comp-pending-nome">{comp.nome}</div>
+                    <div className="comp-pending-meta">
+                      <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
+                      <span>{v?.nome||'?'}</span>
+                      <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
+                      <span className={`comp-status-badge ${st}`} style={{marginLeft:4}}>
+                        {st==='aprovado'?'Aprovado':'Rejeitado'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="comp-pending-actions">
+                    <button className="comp-view-btn" onClick={()=>verComp(comp)}>Ver</button>
+                    {editando ? (
+                      <>
+                        <button className="btn-aprovar" style={{fontSize:11}} onClick={()=>editarStatus(comp,'aprovado')}>Aprovado</button>
+                        <button className="btn-danger" style={{padding:'5px 10px',fontSize:11}} onClick={()=>editarStatus(comp,'rejeitado')}>Rejeitado</button>
+                        <button className="btn-ghost" style={{padding:'5px 10px',fontSize:11}} onClick={()=>setEditandoCompId(null)}>Cancelar</button>
+                      </>
+                    ) : (
+                      <button className="btn-ghost" style={{padding:'5px 12px',fontSize:11}} onClick={()=>setEditandoCompId(comp.id)}>Editar</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
