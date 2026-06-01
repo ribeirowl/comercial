@@ -388,6 +388,7 @@ function App() {
   const [toasts, setToasts]   = useState([]);
   const [theme, setTheme]     = useState('paper');
   const [accent, setAccent]   = useState('#ffc41f');
+  const [viewDate, setViewDate] = useState(''); // '' = hoje (tempo real)
   const [density, setDensity] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -464,22 +465,58 @@ function App() {
     );
   }
 
+  // Estado filtrado até a data selecionada (modo histórico)
+  const stateView = React.useMemo(() => {
+    if (!viewDate) return state;
+    const cutoff = viewDate + 'T23:59:59.999Z';
+    return {
+      ...state,
+      lancamentos:  state.lancamentos.filter(l  => l.data  <= cutoff),
+      comprovantes: (state.comprovantes||[]).filter(c => c.data <= cutoff),
+    };
+  }, [state, viewDate]);
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="app-shell">
       <Masthead tab={tab} setTab={setTab} currentUser={currentUser} onLogout={handleLogout} logoSrc={theme==='carbon'&&logoDarkSrc?logoDarkSrc:logoSrc}/>
 
+      {/* Banner modo histórico */}
+      {viewDate && (
+        <div className="history-mode-bar">
+          <span>
+            Visualizando: <strong>{new Date(viewDate+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</strong>
+          </span>
+          <button onClick={() => setViewDate('')} className="history-mode-close">× Voltar ao tempo real</button>
+        </div>
+      )}
+
+      {/* Seletor de data histórica */}
+      <div className="history-date-bar">
+        <span className="history-date-label">Voltar no tempo:</span>
+        <input
+          type="date"
+          className="history-date-input"
+          value={viewDate}
+          max={hoje}
+          onChange={e => setViewDate(e.target.value)}
+        />
+        {viewDate && <button className="btn-ghost" style={{fontSize:11}} onClick={() => setViewDate('')}>Hoje</button>}
+      </div>
+
       <main className="main-col">
-        {tab===0 && <RankingTab  state={state} dispatch={dispatch} currentUser={currentUser}/>}
-        {tab===1 && <LancarTab   state={state} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
+        {tab===0 && <RankingTab  state={stateView} dispatch={dispatch} currentUser={currentUser}/>}
+        {tab===1 && <LancarTab   state={state}     dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
         {tab===2 && (
           <VendedorTab
-            state={state}
+            state={stateView}
             dispatch={dispatch}
             addToast={addToast}
             currentUser={currentUser}
           />
         )}
-        {tab===3 && <FeedTab state={state} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
+        {tab===3 && <FeedTab state={stateView} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
         {tab===5 && (
           <PerfilTab
             state={state}
