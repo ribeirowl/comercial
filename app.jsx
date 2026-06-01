@@ -492,18 +492,20 @@ function App() {
         </div>
       )}
 
-      {/* Seletor de data histórica */}
-      <div className="history-date-bar">
-        <span className="history-date-label">Voltar no tempo:</span>
-        <input
-          type="date"
-          className="history-date-input"
-          value={viewDate}
-          max={hoje}
-          onChange={e => setViewDate(e.target.value)}
-        />
-        {viewDate && <button className="btn-ghost" style={{fontSize:11}} onClick={() => setViewDate('')}>Hoje</button>}
-      </div>
+      {/* Seletor de data histórica — apenas gerência */}
+      {currentUser?.role === 'gerencia' && (
+        <div className="history-date-bar">
+          <span className="history-date-label">Voltar no tempo:</span>
+          <input
+            type="date"
+            className="history-date-input"
+            value={viewDate}
+            max={hoje}
+            onChange={e => setViewDate(e.target.value)}
+          />
+          {viewDate && <button className="btn-ghost" style={{fontSize:11}} onClick={() => setViewDate('')}>Hoje</button>}
+        </div>
+      )}
 
       <main className="main-col">
         {tab===0 && <RankingTab  state={stateView} dispatch={dispatch} currentUser={currentUser}/>}
