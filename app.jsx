@@ -444,6 +444,19 @@ function App() {
     setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)), 3200);
   };
 
+  // Hooks devem vir antes de qualquer return condicional
+  const stateView = React.useMemo(() => {
+    if (!viewDate) return state;
+    const cutoff = viewDate + 'T23:59:59.999Z';
+    return {
+      ...state,
+      lancamentos:  state.lancamentos.filter(l  => l.data  <= cutoff),
+      comprovantes: (state.comprovantes||[]).filter(c => c.data <= cutoff),
+    };
+  }, [state, viewDate]);
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
   if (loading) {
     return (
       <div className="app-shell" style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh'}}>
@@ -464,19 +477,6 @@ function App() {
       </div>
     );
   }
-
-  // Estado filtrado até a data selecionada (modo histórico)
-  const stateView = React.useMemo(() => {
-    if (!viewDate) return state;
-    const cutoff = viewDate + 'T23:59:59.999Z';
-    return {
-      ...state,
-      lancamentos:  state.lancamentos.filter(l  => l.data  <= cutoff),
-      comprovantes: (state.comprovantes||[]).filter(c => c.data <= cutoff),
-    };
-  }, [state, viewDate]);
-
-  const hoje = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="app-shell">
