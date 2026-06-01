@@ -316,6 +316,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
   const [vid, setVid]     = useState('');
   const [resps, setResps] = useState({}); // { [cid]: { simNao: null|'sim'|'nao', pts: '' } }
   const [obs, setObs]     = useState('');
+  const [dataLanc, setDataLanc] = useState(''); // '' = hoje
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -488,13 +489,14 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         dispatch({ type: 'ADD_LANCAMENTO', payload: {
           id: maxId, vendedorId: Number(vid), criterioId: c.id,
           pontos: pts, obs: obs.trim(),
-          data: new Date().toISOString(), streakAplicado: bonus,
+          data: dataLanc ? new Date(dataLanc + 'T12:00:00').toISOString() : new Date().toISOString(),
+          streakAplicado: bonus,
           lancadoPor: currentUser?.username || null,
         }});
       });
       setLoading(false); setSuccess(true);
       addToast(`+${total} pts lançados para ${nomeFirst(vendedor.nome)} (${prontos.length} critério${prontos.length>1?'s':''}).`, 'success');
-      setTimeout(() => { setSuccess(false); setVid(''); setResps({}); setObs(''); }, 1600);
+      setTimeout(() => { setSuccess(false); setVid(''); setResps({}); setObs(''); setDataLanc(''); }, 1600);
     }, 500);
   };
 
@@ -643,6 +645,24 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="field-group" style={{marginTop:12}}>
+                <label className="field-label">Data do lançamento</label>
+                <input
+                  type="date"
+                  className="field-input"
+                  value={dataLanc}
+                  max={new Date().toISOString().slice(0,10)}
+                  onChange={e => setDataLanc(e.target.value)}
+                  style={{width:'100%'}}
+                />
+                {dataLanc && (
+                  <div style={{marginTop:4,fontSize:11,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace'}}>
+                    Lançando com data retroativa: {new Date(dataLanc+'T12:00:00').toLocaleDateString('pt-BR')}
+                    {' '}· <button className="btn-ghost" style={{fontSize:11,padding:'0 4px'}} onClick={()=>setDataLanc('')}>usar hoje</button>
+                  </div>
+                )}
               </div>
 
               <FieldTextarea
