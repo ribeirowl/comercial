@@ -1,5 +1,5 @@
 // app.jsx — App shell, LoginScreen, Masthead, TweaksPanel, auth
-const { useState, useEffect, useReducer, useRef } = React;
+const { useState, useEffect, useReducer, useRef, useMemo } = React;
 
 // Remove fundo branco do PNG via canvas: pixels com os 3 canais > 230 viram transparentes.
 // Abordagem pixel-a-pixel (sem BFS) é suficiente para logos que não têm branco no design.
@@ -445,7 +445,7 @@ function App() {
   };
 
   // Hooks devem vir antes de qualquer return condicional
-  const stateView = React.useMemo(() => {
+  const stateView = useMemo(() => {
     if (!viewDate) return state;
     const cutoff = viewDate + 'T23:59:59.999Z';
     return {
