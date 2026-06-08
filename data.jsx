@@ -14,7 +14,7 @@ const _C2S = {
   streakSemanas:'streak_semanas',
   canceladoPor:'cancelado_por', canceladoEm:'cancelado_em',
   lancadoPor:'lancado_por', tipoLimite:'tipo_limite',
-  criterioIds:'criterio_ids', criteriosConfig:'criterios_config',
+  criterioIds:'criterio_ids', criteriosConfig:'criterios_config', campanhaId:'campanha_id',
   dataInicio:'data_inicio', dataFim:'data_fim',
   mostrarVendedores:'mostrar_vendedores', mostrarLojas:'mostrar_lojas',
   mostrarCursos:'mostrar_cursos', criadoPor:'criado_por',
@@ -446,15 +446,18 @@ function proximoNivel(pts, niveis) {
   return [...niveis].sort((a,b)=>a.minPontos-b.minPontos).find(n=>n.minPontos>pts)||null;
 }
 
+// lancamentos de campanha são excluídos do ranking geral
+const _semCampanha = l => !l.cancelado && !l.campanhaId;
+
 function pontosTotal(id, lancs) {
-  return lancs.filter(l=>l.vendedorId===id && !l.cancelado).reduce((s,l)=>s+l.pontos,0);
+  return lancs.filter(l=>l.vendedorId===id && _semCampanha(l)).reduce((s,l)=>s+l.pontos,0);
 }
 
 function pontosMes(id, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===id && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return l.vendedorId===id && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).reduce((s,l)=>s+l.pontos,0);
 }
 
@@ -462,7 +465,7 @@ function countNoMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).length;
 }
 
@@ -470,7 +473,7 @@ function pontosNoCriterioMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).reduce((s,l)=>s+l.pontos,0);
 }
 

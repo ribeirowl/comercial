@@ -1637,16 +1637,19 @@ function CampanhaRanking({ campanha, state }) {
     vendedores.filter(v => v.ativo && (campLojaIds.length === 0 || campLojaIds.includes(Number(v.lojaId)))),
   [vendedores, campLojaIds]);
 
+  // Lançamentos exclusivos desta campanha (marcados com campanhaId)
+  const lancsCamp = useMemo(() =>
+    lancamentos.filter(l => !l.cancelado && Number(l.campanhaId) === Number(campanha.id)),
+  [lancamentos, campanha.id]);
+
   const vendRank = useMemo(() => {
     return vendFiltrados.map(v => {
-      const pts = lancamentos.filter(l =>
-        l.vendedorId === v.id && !l.cancelado &&
-        criterioIds.includes(l.criterioId) &&
-        new Date(l.data) >= start && new Date(l.data) <= end
-      ).reduce((s, l) => s + (campPontosMap[l.criterioId] ?? l.pontos), 0);
+      const pts = lancsCamp
+        .filter(l => l.vendedorId === v.id)
+        .reduce((s, l) => s + l.pontos, 0);
       return { ...v, pts };
     }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [vendFiltrados, lancamentos, campanha, criterioIds, campPontosMap]);
+  }, [vendFiltrados, lancsCamp]);
 
   const lojaRank = useMemo(() => {
     if (!campanha.mostrarLojas) return [];
@@ -1655,16 +1658,11 @@ function CampanhaRanking({ campanha, state }) {
       : lojas;
     return lojasAlvo.map(loja => {
       const vs = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
-      const total = vs.reduce((s,v) => {
-        return s + lancamentos.filter(l =>
-          l.vendedorId === v.id && !l.cancelado &&
-          criterioIds.includes(l.criterioId) &&
-          new Date(l.data) >= start && new Date(l.data) <= end
-        ).reduce((ss, l) => ss + (campPontosMap[l.criterioId] ?? l.pontos), 0);
-      }, 0);
+      const total = vs.reduce((s,v) =>
+        s + lancsCamp.filter(l => l.vendedorId === v.id).reduce((ss,l) => ss+l.pontos, 0), 0);
       return { ...loja, pts: vs.length ? Math.round(total / vs.length) : 0, vAtivos: vs.length };
     }).filter(l => l.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [lojas, vendedores, lancamentos, campanha, criterioIds, campPontosMap, campLojaIds]);
+  }, [lojas, vendedores, lancsCamp, campLojaIds]);
 
   const cursosRank = useMemo(() => {
     if (!campanha.mostrarCursos) return [];
@@ -1787,25 +1785,18 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
       data: new Date().toISOString(),
       obs: sel.obs || `Campanha: ${campanha.nome}`,
       lancadoPor: currentUser?.username || '',
+      campanhaId: campanha.id,
     }});
     addToast(`${pontosNum} pts lançados para ${vNome}.`, 'success');
     setSel(p => ({ ...p, vendedorId:'', obs:'' }));
   };
 
   // Ranking ao vivo calculado localmente
-  const start = new Date(campanha.dataInicio);
-  const end   = new Date(campanha.dataFim);
-  const campPtsMap = {};
-  (campanha.criteriosConfig||[]).forEach(c => { if(c.criterioId) campPtsMap[c.criterioId] = c.pontos; });
-  const criterioIds = Object.keys(campPtsMap).map(Number);
-
   const liveRank = useMemo(() => {
     return vendDisp.map(v => {
-      const pts = lancamentos.filter(l =>
-        l.vendedorId === v.id && !l.cancelado &&
-        criterioIds.includes(l.criterioId) &&
-        new Date(l.data) >= start && new Date(l.data) <= end
-      ).reduce((s, l) => s + (campPtsMap[l.criterioId] ?? l.pontos), 0);
+      const pts = lancamentos
+        .filter(l => !l.cancelado && Number(l.campanhaId) === Number(campanha.id) && l.vendedorId === v.id)
+        .reduce((s, l) => s + l.pontos, 0);
       return { ...v, pts };
     }).sort((a,b) => b.pts - a.pts);
   }, [vendDisp, lancamentos, campanha]);
@@ -2039,18 +2030,10 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
   };
 
   const premiarVencedores = (campanha) => {
-    // calcula o ranking da campanha para identificar os vencedores
-    const start = new Date(campanha.dataInicio);
-    const end   = new Date(campanha.dataFim);
-    const campCritIds = (campanha.criteriosConfig||[]).map(c => c.criterioId).filter(Boolean);
-    const campPtsMap  = {};
-    (campanha.criteriosConfig||[]).forEach(c => { if (c.criterioId) campPtsMap[c.criterioId] = c.pontos; });
     const rank  = vendedores.filter(v => v.ativo).map(v => {
-      const pts = (state.lancamentos||[]).filter(l =>
-        l.vendedorId === v.id && !l.cancelado &&
-        campCritIds.includes(l.criterioId) &&
-        new Date(l.data) >= start && new Date(l.data) <= end
-      ).reduce((s, l) => s + (campPtsMap[l.criterioId] ?? l.pontos), 0);
+      const pts = (state.lancamentos||[])
+        .filter(l => !l.cancelado && Number(l.campanhaId) === Number(campanha.id) && l.vendedorId === v.id)
+        .reduce((s, l) => s + l.pontos, 0);
       return { ...v, pts };
     }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
 
