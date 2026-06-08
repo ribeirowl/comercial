@@ -787,16 +787,20 @@ function ComprovantesSection({ vendedorId, state, dispatch, addToast }) {
     setUploading(true);
     const reader = new FileReader();
     reader.onload = ev => {
-      const id = Date.now() + Math.random();
-      dispatch({ type: 'ADD_COMPROVANTE', payload: {
-        id,
-        vendedorId,
-        nome: file.name,
-        tipo: file.type,
-        dados: ev.target.result,
-        data: new Date().toISOString(),
-        status: 'pendente',
-      }});
+      const tempId = Date.now();
+      dispatch({
+        type: 'ADD_COMPROVANTE',
+        payload: {
+          id: tempId,
+          vendedorId,
+          nome: file.name,
+          tipo: file.type,
+          dados: ev.target.result,
+          data: new Date().toISOString(),
+          status: 'pendente',
+        },
+        _dispatch: dispatch,
+      });
       addToast(`Comprovante "${file.name}" anexado.`, 'success');
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';

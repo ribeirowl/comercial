@@ -386,7 +386,7 @@ function App() {
   const [state, baseDispatch] = useReducer(reducer, SEED_STATE);
   const [tab, setTab]     = useState(0);
   const [toasts, setToasts]   = useState([]);
-  const [theme, setTheme]     = useState('paper');
+  const [theme, setTheme]     = useState('carbon');
   const [accent, setAccent]   = useState('#ffc41f');
   const [viewDate, setViewDate] = useState(''); // '' = hoje (tempo real)
   const [density, setDensity] = useState('');

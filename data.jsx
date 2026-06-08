@@ -60,68 +60,76 @@ async function loadFromSupabase() {
 }
 
 async function syncAction(action) {
+  const _chk = (res, label) => { if (res?.error) console.error(`[sync:${label}]`, res.error.message, res.error); };
   try {
     switch (action.type) {
       case 'ADD_LANCAMENTO':
-        await _sb.from('lancamentos').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('lancamentos').insert(_toRow(action.payload)), 'ADD_LANCAMENTO'); break;
       case 'REMOVE_LANCAMENTO':
-        await _sb.from('lancamentos').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('lancamentos').delete().eq('id', action.payload), 'REMOVE_LANCAMENTO'); break;
       case 'CANCEL_LANCAMENTO':
-        await _sb.from('lancamentos').update(_toRow({
-          cancelado: true,
-          canceladoPor: action.payload.canceladoPor,
-          canceladoEm:  action.payload.canceladoEm,
-        })).eq('id', action.payload.id); break;
+        _chk(await _sb.from('lancamentos').update(_toRow({
+          cancelado: true, canceladoPor: action.payload.canceladoPor, canceladoEm: action.payload.canceladoEm,
+        })).eq('id', action.payload.id), 'CANCEL_LANCAMENTO'); break;
       case 'ADD_VENDEDOR':
-        await _sb.from('vendedores').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('vendedores').insert(_toRow(action.payload)), 'ADD_VENDEDOR'); break;
       case 'UPDATE_VENDEDOR':
-        await _sb.from('vendedores').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+        _chk(await _sb.from('vendedores').update(_toRow(action.payload.changes)).eq('id', action.payload.id), 'UPDATE_VENDEDOR'); break;
       case 'REMOVE_VENDEDOR':
-        await _sb.from('vendedores').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('vendedores').delete().eq('id', action.payload), 'REMOVE_VENDEDOR'); break;
       case 'ADD_CRITERIO':
-        await _sb.from('criterios').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('criterios').insert(_toRow(action.payload)), 'ADD_CRITERIO'); break;
       case 'UPDATE_CRITERIO': {
         const { id, field, value } = action.payload;
-        await _sb.from('criterios').update(_toRow({[field]:value})).eq('id', id); break;
+        _chk(await _sb.from('criterios').update(_toRow({[field]:value})).eq('id', id), 'UPDATE_CRITERIO'); break;
       }
       case 'REMOVE_CRITERIO':
-        await _sb.from('criterios').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('criterios').delete().eq('id', action.payload), 'REMOVE_CRITERIO'); break;
       case 'ADD_NIVEL':
-        await _sb.from('niveis').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('niveis').insert(_toRow(action.payload)), 'ADD_NIVEL'); break;
       case 'UPDATE_NIVEL': {
         const { id, field, value } = action.payload;
-        await _sb.from('niveis').update(_toRow({[field]:value})).eq('id', id); break;
+        _chk(await _sb.from('niveis').update(_toRow({[field]:value})).eq('id', id), 'UPDATE_NIVEL'); break;
       }
       case 'REMOVE_NIVEL':
-        await _sb.from('niveis').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('niveis').delete().eq('id', action.payload), 'REMOVE_NIVEL'); break;
       case 'UPDATE_CONFIG': {
         const { field, value } = action.payload;
-        await _sb.from('app_config').update(_toRow({[field]:value})).eq('id', 1); break;
+        _chk(await _sb.from('app_config').update(_toRow({[field]:value})).eq('id', 1), 'UPDATE_CONFIG'); break;
       }
       case 'ADD_USUARIO':
-        await _sb.from('usuarios').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('usuarios').insert(_toRow(action.payload)), 'ADD_USUARIO'); break;
       case 'UPDATE_USUARIO':
-        await _sb.from('usuarios').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+        _chk(await _sb.from('usuarios').update(_toRow(action.payload.changes)).eq('id', action.payload.id), 'UPDATE_USUARIO'); break;
       case 'REMOVE_USUARIO':
-        await _sb.from('usuarios').delete().eq('id', action.payload); break;
-      case 'ADD_COMPROVANTE':
-        await _sb.from('comprovantes').insert(_toRow(action.payload)); break;
+        _chk(await _sb.from('usuarios').delete().eq('id', action.payload), 'REMOVE_USUARIO'); break;
+      case 'ADD_COMPROVANTE': {
+        const payload = { ..._toRow(action.payload) };
+        delete payload.id; // deixa o banco gerar pelo nextval
+        const { data: compRes, error: compErr } = await _sb.from('comprovantes').insert(payload).select('id').single();
+        if (compErr) { console.error('[ADD_COMPROVANTE]', compErr); break; }
+        if (compRes && typeof action._dispatch === 'function') {
+          // Troca o id temporário pelo id real do banco
+          action._dispatch({ type:'UPDATE_COMPROVANTE', payload:{ id: action.payload.id, changes:{ id: compRes.id } } });
+        }
+        break;
+      }
       case 'REMOVE_COMPROVANTE':
-        await _sb.from('comprovantes').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('comprovantes').delete().eq('id', action.payload), 'REMOVE_COMPROVANTE'); break;
       case 'UPDATE_COMPROVANTE':
-        await _sb.from('comprovantes').update(_toRow(action.payload.changes)).eq('id', action.payload.id); break;
+        _chk(await _sb.from('comprovantes').update(_toRow(action.payload.changes)).eq('id', action.payload.id), 'UPDATE_COMPROVANTE'); break;
       case 'ADD_LOJA':
-        await _sb.from('lojas').insert(action.payload); break;
+        _chk(await _sb.from('lojas').insert(action.payload), 'ADD_LOJA'); break;
       case 'UPDATE_LOJA':
-        await _sb.from('lojas').update(action.payload.changes).eq('id', action.payload.id); break;
+        _chk(await _sb.from('lojas').update(action.payload.changes).eq('id', action.payload.id), 'UPDATE_LOJA'); break;
       case 'REMOVE_LOJA':
-        await _sb.from('lojas').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('lojas').delete().eq('id', action.payload), 'REMOVE_LOJA'); break;
       case 'UPSERT_FAT_MENSAL': {
         const { lojaId, mes, ano, faturamento, meta } = action.payload;
-        await _sb.from('faturamento_mensal').upsert(
+        _chk(await _sb.from('faturamento_mensal').upsert(
           { loja_id: lojaId, mes, ano, faturamento, meta },
           { onConflict: 'loja_id,mes,ano' }
-        ); break;
+        ), 'UPSERT_FAT_MENSAL'); break;
       }
       case 'ADD_CURSO': {
         const { data: cursosRes, error: cursosErr } = await _sb.from('cursos').insert({
@@ -143,14 +151,14 @@ async function syncAction(action) {
         break;
       }
       case 'REMOVE_CURSO':
-        await _sb.from('cursos').delete().eq('id', action.payload); break;
+        _chk(await _sb.from('cursos').delete().eq('id', action.payload), 'REMOVE_CURSO'); break;
       case 'UPDATE_CURSO':
-        await _sb.from('cursos').update({
+        _chk(await _sb.from('cursos').update({
           titulo: action.payload.changes.titulo,
           link: action.payload.changes.link,
           descricao: action.payload.changes.descricao,
           vendedor_ids: action.payload.changes.vendedorIds || [],
-        }).eq('id', action.payload.id); break;
+        }).eq('id', action.payload.id), 'UPDATE_CURSO'); break;
       case 'RESET':
         await _sbReset(); break;
     }
