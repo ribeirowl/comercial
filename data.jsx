@@ -14,7 +14,8 @@ const _C2S = {
   streakSemanas:'streak_semanas',
   canceladoPor:'cancelado_por', canceladoEm:'cancelado_em',
   lancadoPor:'lancado_por', tipoLimite:'tipo_limite',
-  criterioIds:'criterio_ids', dataInicio:'data_inicio', dataFim:'data_fim',
+  criterioIds:'criterio_ids', criteriosConfig:'criterios_config',
+  dataInicio:'data_inicio', dataFim:'data_fim',
   mostrarVendedores:'mostrar_vendedores', mostrarLojas:'mostrar_lojas',
   mostrarCursos:'mostrar_cursos', criadoPor:'criado_por',
 };
@@ -54,16 +55,23 @@ async function loadFromSupabase() {
       descricao: c.descricao||'', data: c.data,
       vendedorIds: Array.isArray(c.vendedor_ids) ? c.vendedor_ids : [],
     })),
-    campanhas: (camp.data||[]).map(c => ({
-      id: c.id, nome: c.nome, descricao: c.descricao||'',
-      dataInicio: c.data_inicio, dataFim: c.data_fim,
-      criterioIds: Array.isArray(c.criterio_ids) ? c.criterio_ids : [],
-      premiacoes: Array.isArray(c.premiacoes) ? c.premiacoes : [],
-      mostrarVendedores: c.mostrar_vendedores ?? true,
-      mostrarLojas: c.mostrar_lojas ?? false,
-      mostrarCursos: c.mostrar_cursos ?? false,
-      ativo: c.ativo ?? true, criadoPor: c.criado_por||'',
-    })),
+    campanhas: (camp.data||[]).map(c => {
+      // criteriosConfig é o novo formato: [{criterioId, nome, pontos}]
+      // criterio_ids é legacy — migrado para criteriosConfig on load
+      const cfg = Array.isArray(c.criterios_config) && c.criterios_config.length > 0
+        ? c.criterios_config
+        : (Array.isArray(c.criterio_ids) ? c.criterio_ids.map(id => ({ criterioId: id, nome: '', pontos: 0 })) : []);
+      return {
+        id: c.id, nome: c.nome, descricao: c.descricao||'',
+        dataInicio: c.data_inicio, dataFim: c.data_fim,
+        criteriosConfig: cfg,
+        premiacoes: Array.isArray(c.premiacoes) ? c.premiacoes : [],
+        mostrarVendedores: c.mostrar_vendedores ?? true,
+        mostrarLojas: c.mostrar_lojas ?? false,
+        mostrarCursos: c.mostrar_cursos ?? false,
+        ativo: c.ativo ?? true, criadoPor: c.criado_por||'',
+      };
+    }),
     vendedores: (vend.data||[]).map(v => ({
       ..._fromRow(v),
       achievements: Array.isArray(v.achievements) ? v.achievements : [],
@@ -168,10 +176,12 @@ async function syncAction(action) {
         break;
       }
       case 'ADD_CAMPANHA': {
+        const cfg = action.payload.criteriosConfig || [];
         const { data: campRes, error: campErr } = await _sb.from('campanhas').insert({
           nome: action.payload.nome, descricao: action.payload.descricao||'',
           data_inicio: action.payload.dataInicio, data_fim: action.payload.dataFim,
-          criterio_ids: action.payload.criterioIds||[],
+          criterio_ids: cfg.map(c => c.criterioId).filter(Boolean),
+          criterios_config: cfg,
           premiacoes: action.payload.premiacoes||[],
           mostrar_vendedores: action.payload.mostrarVendedores??true,
           mostrar_lojas: action.payload.mostrarLojas??false,
@@ -184,19 +194,24 @@ async function syncAction(action) {
           action._dispatch({ type:'UPDATE_CAMPANHA', payload:{ id: action.payload.id, changes:{ id: campRes.id } } });
         break;
       }
-      case 'UPDATE_CAMPANHA':
-        _chk(await _sb.from('campanhas').update({
-          nome: action.payload.changes.nome,
-          descricao: action.payload.changes.descricao,
-          data_inicio: action.payload.changes.dataInicio,
-          data_fim: action.payload.changes.dataFim,
-          criterio_ids: action.payload.changes.criterioIds,
-          premiacoes: action.payload.changes.premiacoes,
-          mostrar_vendedores: action.payload.changes.mostrarVendedores,
-          mostrar_lojas: action.payload.changes.mostrarLojas,
-          mostrar_cursos: action.payload.changes.mostrarCursos,
-          ativo: action.payload.changes.ativo,
-        }).eq('id', action.payload.id), 'UPDATE_CAMPANHA'); break;
+      case 'UPDATE_CAMPANHA': {
+        const ch = action.payload.changes;
+        if (ch.criteriosConfig !== undefined || ch.nome !== undefined) {
+          const cfg = ch.criteriosConfig || [];
+          _chk(await _sb.from('campanhas').update({
+            nome: ch.nome, descricao: ch.descricao,
+            data_inicio: ch.dataInicio, data_fim: ch.dataFim,
+            criterio_ids: cfg.map(c => c.criterioId).filter(Boolean),
+            criterios_config: cfg,
+            premiacoes: ch.premiacoes,
+            mostrar_vendedores: ch.mostrarVendedores,
+            mostrar_lojas: ch.mostrarLojas,
+            mostrar_cursos: ch.mostrarCursos,
+            ativo: ch.ativo,
+          }).eq('id', action.payload.id), 'UPDATE_CAMPANHA');
+        }
+        break;
+      }
       case 'REMOVE_CAMPANHA':
         _chk(await _sb.from('campanhas').delete().eq('id', action.payload), 'REMOVE_CAMPANHA'); break;
       case 'AWARD_ACHIEVEMENT':

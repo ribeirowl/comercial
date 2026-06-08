@@ -1615,18 +1615,29 @@ function AchievementBadge({ ach, size = 'md' }) {
 function CampanhaRanking({ campanha, state }) {
   const { vendedores, lancamentos, lojas, comprovantes } = state;
   const start = new Date(campanha.dataInicio);
-  const end   = new Date(campanha.dataFim + (campanha.dataFim.length === 10 ? 'T23:59:59Z' : ''));
+  const end   = new Date(campanha.dataFim + (campanha.dataFim && campanha.dataFim.length === 10 ? 'T23:59:59Z' : ''));
+
+  // Mapa criterioId → pontos da campanha (usa pontos customizados da campanha)
+  const campPontosMap = useMemo(() => {
+    const map = {};
+    (campanha.criteriosConfig || []).forEach(c => { if (c.criterioId) map[c.criterioId] = c.pontos; });
+    return map;
+  }, [campanha]);
+
+  const criterioIds = useMemo(() =>
+    (campanha.criteriosConfig || []).map(c => c.criterioId).filter(Boolean),
+  [campanha]);
 
   const vendRank = useMemo(() => {
     return vendedores.filter(v => v.ativo).map(v => {
       const pts = lancamentos.filter(l =>
         l.vendedorId === v.id && !l.cancelado &&
-        campanha.criterioIds.includes(l.criterioId) &&
+        criterioIds.includes(l.criterioId) &&
         new Date(l.data) >= start && new Date(l.data) <= end
-      ).reduce((s,l) => s+l.pontos, 0);
+      ).reduce((s, l) => s + (campPontosMap[l.criterioId] ?? l.pontos), 0);
       return { ...v, pts };
     }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [vendedores, lancamentos, campanha]);
+  }, [vendedores, lancamentos, campanha, criterioIds, campPontosMap]);
 
   const lojaRank = useMemo(() => {
     if (!campanha.mostrarLojas) return [];
@@ -1635,13 +1646,13 @@ function CampanhaRanking({ campanha, state }) {
       const total = vs.reduce((s,v) => {
         return s + lancamentos.filter(l =>
           l.vendedorId === v.id && !l.cancelado &&
-          campanha.criterioIds.includes(l.criterioId) &&
+          criterioIds.includes(l.criterioId) &&
           new Date(l.data) >= start && new Date(l.data) <= end
-        ).reduce((ss,l) => ss+l.pontos, 0);
+        ).reduce((ss, l) => ss + (campPontosMap[l.criterioId] ?? l.pontos), 0);
       }, 0);
       return { ...loja, pts: vs.length ? Math.round(total / vs.length) : 0, vAtivos: vs.length };
     }).filter(l => l.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [lojas, vendedores, lancamentos, campanha]);
+  }, [lojas, vendedores, lancamentos, campanha, criterioIds, campPontosMap]);
 
   const cursosRank = useMemo(() => {
     if (!campanha.mostrarCursos) return [];
@@ -1735,12 +1746,13 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
     nome:'', descricao:'',
     dataInicio: new Date().toISOString().slice(0,10),
     dataFim: '',
-    criterioIds: [],
+    criteriosConfig: [], // [{criterioId, nome, pontos}]
     premiacoes: [
       { posicao:1, descricao:'Campeão', icone:'🏆', cor:'#FFD700' },
     ],
     mostrarVendedores: true, mostrarLojas: false, mostrarCursos: false,
   };
+  const [novoCrit, setNovoCrit] = useState({ nome:'', pontos:'' });
   const [form, setForm]         = useState(EMPTY_FORM);
   const [editId, setEditId]     = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -1748,9 +1760,32 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const toggleCriterio = id => setF('criterioIds',
-    form.criterioIds.includes(id) ? form.criterioIds.filter(x=>x!==id) : [...form.criterioIds, id]
+  // critérios da campanha
+  const toggleCriterio = (crit) => {
+    const exists = form.criteriosConfig.find(c => c.criterioId === crit.id);
+    if (exists) {
+      setF('criteriosConfig', form.criteriosConfig.filter(c => c.criterioId !== crit.id));
+    } else {
+      setF('criteriosConfig', [...form.criteriosConfig, { criterioId: crit.id, nome: crit.nome, pontos: crit.pontos }]);
+    }
+  };
+
+  const updateCritPontos = (criterioId, pontos) => setF('criteriosConfig',
+    form.criteriosConfig.map(c => c.criterioId === criterioId ? {...c, pontos: Number(pontos)||0} : c)
   );
+
+  const addCriterioCustom = () => {
+    const nome = novoCrit.nome.trim();
+    const pontos = Number(novoCrit.pontos) || 0;
+    if (!nome) return;
+    // Usa o mesmo padrão do config-tab para gerar ID
+    const id = Math.max(0, ...(criterios.map(c => c.id))) + 1;
+    const novoGlobal = { id, nome, pontos, tipo:'valor', modo:'parcial', limitesPorMes:0, tipoLimite:'×' };
+    dispatch({ type:'ADD_CRITERIO', payload: novoGlobal });
+    // Adiciona à campanha
+    setF('criteriosConfig', [...form.criteriosConfig, { criterioId: id, nome, pontos }]);
+    setNovoCrit({ nome:'', pontos:'' });
+  };
 
   const setPremio = (idx, field, val) => setF('premiacoes',
     form.premiacoes.map((p,i) => i===idx ? {...p, [field]:val} : p)
@@ -1773,7 +1808,7 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
   const salvar = () => {
     if (!form.nome.trim()) { addToast('Informe o nome da campanha.', 'error'); return; }
     if (!form.dataFim)     { addToast('Informe a data de término.', 'error'); return; }
-    if (form.criterioIds.length === 0) { addToast('Selecione ao menos um critério.', 'error'); return; }
+    if (form.criteriosConfig.length === 0) { addToast('Adicione ao menos um critério.', 'error'); return; }
 
     const payload = {
       ...form,
@@ -1798,7 +1833,7 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
       nome: c.nome, descricao: c.descricao,
       dataInicio: c.dataInicio.slice(0,10),
       dataFim: c.dataFim.slice(0,10),
-      criterioIds: c.criterioIds,
+      criteriosConfig: c.criteriosConfig || [],
       premiacoes: c.premiacoes,
       mostrarVendedores: c.mostrarVendedores,
       mostrarLojas: c.mostrarLojas,
@@ -1817,12 +1852,15 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
     // calcula o ranking da campanha para identificar os vencedores
     const start = new Date(campanha.dataInicio);
     const end   = new Date(campanha.dataFim);
+    const campCritIds = (campanha.criteriosConfig||[]).map(c => c.criterioId).filter(Boolean);
+    const campPtsMap  = {};
+    (campanha.criteriosConfig||[]).forEach(c => { if (c.criterioId) campPtsMap[c.criterioId] = c.pontos; });
     const rank  = vendedores.filter(v => v.ativo).map(v => {
       const pts = (state.lancamentos||[]).filter(l =>
         l.vendedorId === v.id && !l.cancelado &&
-        campanha.criterioIds.includes(l.criterioId) &&
+        campCritIds.includes(l.criterioId) &&
         new Date(l.data) >= start && new Date(l.data) <= end
-      ).reduce((s,l) => s+l.pontos, 0);
+      ).reduce((s, l) => s + (campPtsMap[l.criterioId] ?? l.pontos), 0);
       return { ...v, pts };
     }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
 
@@ -1884,15 +1922,64 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
           </div>
 
           <div className="field-group" style={{marginBottom:12}}>
-            <label className="field-label">Critérios que contam nesta campanha</label>
-            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
-              {criterios.filter(c=>!c.oculto).map(c => (
-                <button key={c.id}
-                  className={`seg-btn${form.criterioIds.includes(c.id)?' active':''}`}
-                  style={{fontSize:11}} onClick={()=>toggleCriterio(c.id)}>
-                  {c.nome} ({c.pontos}pts)
-                </button>
-              ))}
+            <label className="field-label">Critérios da campanha</label>
+
+            {/* Critérios disponíveis para selecionar */}
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6,marginBottom:8}}>
+              {criterios.filter(c => !c.oculto).map(c => {
+                const sel = form.criteriosConfig.find(cc => cc.criterioId === c.id);
+                return (
+                  <button key={c.id}
+                    className={`seg-btn${sel ? ' active' : ''}`}
+                    style={{fontSize:11}}
+                    onClick={() => toggleCriterio(c)}>
+                    {c.nome} ({sel ? sel.pontos : c.pontos}pts)
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Critérios selecionados com pontos editáveis */}
+            {form.criteriosConfig.length > 0 && (
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
+                <div style={{fontSize:10,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace',textTransform:'uppercase',letterSpacing:'.06em'}}>Pontos por critério nesta campanha</div>
+                {form.criteriosConfig.map((cc) => (
+                  <div key={cc.criterioId} style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{flex:1,fontSize:12,color:'var(--ink-2)'}}>{cc.nome}</div>
+                    <input
+                      type="number" min={1}
+                      className="field-input"
+                      style={{width:70,fontSize:12,textAlign:'right'}}
+                      value={cc.pontos}
+                      onChange={e => updateCritPontos(cc.criterioId, e.target.value)}
+                    />
+                    <span style={{fontSize:11,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace'}}>pts</span>
+                    <button className="btn-danger" style={{padding:'3px 7px',fontSize:12}}
+                      onClick={() => setF('criteriosConfig', form.criteriosConfig.filter(c => c.criterioId !== cc.criterioId))}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Criar critério novo */}
+            <div style={{display:'flex',gap:6,alignItems:'center',borderTop:'1px solid var(--rule)',paddingTop:8}}>
+              <input className="field-input" placeholder="Nome do novo critério"
+                style={{flex:1,fontSize:12}}
+                value={novoCrit.nome}
+                onChange={e => setNovoCrit(p => ({...p, nome:e.target.value}))}
+                onKeyDown={e => e.key==='Enter' && addCriterioCustom()}
+              />
+              <input type="number" className="field-input" placeholder="Pts"
+                style={{width:60,fontSize:12}}
+                value={novoCrit.pontos}
+                min={1}
+                onChange={e => setNovoCrit(p => ({...p, pontos:e.target.value}))}
+                onKeyDown={e => e.key==='Enter' && addCriterioCustom()}
+              />
+              <button className="btn-add" style={{padding:'6px 12px',fontSize:11,whiteSpace:'nowrap'}}
+                onClick={addCriterioCustom}>
+                + Critério
+              </button>
             </div>
           </div>
 
@@ -1971,7 +2058,7 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
                 {c.descricao && <div className="camp-card-desc">{c.descricao}</div>}
                 <div className="camp-card-meta">
                   <span>{new Date(c.dataInicio).toLocaleDateString('pt-BR')} → {new Date(c.dataFim).toLocaleDateString('pt-BR')}</span>
-                  <span>· {c.criterioIds.length} critério{c.criterioIds.length!==1?'s':''}</span>
+                  <span>· {(c.criteriosConfig||[]).length} critério{(c.criteriosConfig||[]).length!==1?'s':''}</span>
                   {c.premiacoes.length > 0 && <span>· {c.premiacoes.map(p=>p.icone).join('')} {c.premiacoes.length} premiação{c.premiacoes.length!==1?'ões':''}</span>}
                 </div>
               </div>
