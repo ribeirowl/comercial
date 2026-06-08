@@ -97,6 +97,9 @@ async function syncAction(action) {
         _chk(await _sb.from('lancamentos').update(_toRow({
           cancelado: true, canceladoPor: action.payload.canceladoPor, canceladoEm: action.payload.canceladoEm,
         })).eq('id', action.payload.id), 'CANCEL_LANCAMENTO'); break;
+      case 'UPDATE_LANCAMENTO':
+        _chk(await _sb.from('lancamentos').update({ pontos: action.payload.pontos })
+          .eq('id', action.payload.id), 'UPDATE_LANCAMENTO'); break;
       case 'ADD_VENDEDOR':
         _chk(await _sb.from('vendedores').insert(_toRow(action.payload)), 'ADD_VENDEDOR'); break;
       case 'UPDATE_VENDEDOR':
@@ -369,6 +372,9 @@ function reducer(state, action) {
     case 'REMOVE_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.filter(l=>l.id!==action.payload) };
     case 'CANCEL_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.map(l=>
       l.id===action.payload.id ? {...l, cancelado:true, canceladoPor:action.payload.canceladoPor, canceladoEm:action.payload.canceladoEm} : l
+    )};
+    case 'UPDATE_LANCAMENTO': return { ...state, lancamentos:state.lancamentos.map(l=>
+      l.id===action.payload.id ? {...l, pontos:action.payload.pontos} : l
     )};
     case 'ADD_VENDEDOR':    return { ...state, vendedores:[...state.vendedores, action.payload] };
     case 'UPDATE_VENDEDOR': return { ...state, vendedores:state.vendedores.map(v=>v.id===action.payload.id?{...v,...action.payload.changes}:v) };

@@ -1750,7 +1750,9 @@ function CampanhaRanking({ campanha, state }) {
 
 // ── LANÇAMENTO DE PONTOS DA CAMPANHA (gerência) ───────────────────────────────
 function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser }) {
-  const [sel, setSel] = useState({ vendedorId:'', criterioId:'', obs:'', pontos:'' });
+  const [sel, setSel]         = useState({ vendedorId:'', criterioId:'', obs:'', pontos:'' });
+  const [editingId, setEditingId] = useState(null); // id do lancamento sendo editado
+  const [editPts, setEditPts]     = useState('');
 
   const vendedores  = state.vendedores  || [];
   const lancamentos = state.lancamentos || [];
@@ -1786,6 +1788,23 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
     }});
     addToast(`${pontosNum} pts lançados para ${vNome}.`, 'success');
     setSel(p => ({ ...p, vendedorId:'', obs:'' }));
+  };
+
+  const cancelarLanc = l => {
+    dispatch({ type:'CANCEL_LANCAMENTO', payload:{
+      id: l.id, canceladoPor: currentUser?.username || '', canceladoEm: new Date().toISOString(),
+    }});
+    addToast('Lançamento removido.', 'info');
+  };
+
+  const iniciarEdicao = l => { setEditingId(l.id); setEditPts(String(l.pontos)); };
+
+  const salvarEdicao = l => {
+    const p = Number(editPts);
+    if (!p || p <= 0) { addToast('Pontos inválidos.', 'error'); return; }
+    dispatch({ type:'UPDATE_LANCAMENTO', payload:{ id: l.id, pontos: p } });
+    addToast('Pontos atualizados.', 'success');
+    setEditingId(null);
   };
 
   // ranking ao vivo — calculado sem useMemo para simplicidade
@@ -1874,6 +1893,71 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
           ))}
         </div>
       )}
+
+      {/* Histórico de lançamentos desta campanha */}
+      {(() => {
+        const historico = lancamentos
+          .filter(l => Number(l.campanhaId) === campId)
+          .sort((a,b) => new Date(b.data) - new Date(a.data));
+        if (!historico.length) return null;
+        return (
+          <div style={{marginTop:20}}>
+            <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>
+              Lançamentos da campanha
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:0}}>
+              {historico.map(l => {
+                const v = vendedores.find(vv => vv.id === l.vendedorId);
+                const cNome = (criteriosCamp.find(c => c.criterioId === l.criterioId) || {}).nome || `Critério ${l.criterioId}`;
+                const isEdit = editingId === l.id;
+                return (
+                  <div key={l.id} style={{
+                    display:'grid', gridTemplateColumns:'1fr 110px 80px auto',
+                    alignItems:'center', gap:8, padding:'7px 0',
+                    borderBottom:'1px solid var(--rule)',
+                    opacity: l.cancelado ? 0.4 : 1,
+                    textDecoration: l.cancelado ? 'line-through' : 'none',
+                  }}>
+                    <div>
+                      <span style={{fontSize:12,fontWeight:600}}>{v?.nome || '—'}</span>
+                      <span style={{fontSize:11,color:'var(--ink-4)',marginLeft:8}}>{cNome}</span>
+                      {l.obs && <span style={{fontSize:10,color:'var(--ink-4)',marginLeft:8,fontStyle:'italic'}}>{l.obs}</span>}
+                    </div>
+                    <div style={{fontSize:11,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace'}}>
+                      {new Date(l.data).toLocaleDateString('pt-BR')}
+                    </div>
+                    {isEdit ? (
+                      <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                        <input type="number" min={1} className="field-input"
+                          style={{width:56,fontSize:12,fontWeight:700,textAlign:'center',padding:'3px 4px'}}
+                          value={editPts} onChange={e=>setEditPts(e.target.value)}
+                          onKeyDown={e=>e.key==='Enter'&&salvarEdicao(l)}
+                          autoFocus/>
+                        <button className="btn-aprovar" style={{padding:'3px 7px',fontSize:11}} onClick={()=>salvarEdicao(l)}>✓</button>
+                      </div>
+                    ) : (
+                      <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:13,fontWeight:700,color:'var(--accent)'}}>
+                        {l.pontos} pts
+                      </div>
+                    )}
+                    {!l.cancelado && (
+                      <div style={{display:'flex',gap:4}}>
+                        <button className="btn-ghost" style={{padding:'3px 8px',fontSize:11}}
+                          onClick={()=> isEdit ? setEditingId(null) : iniciarEdicao(l)}>
+                          {isEdit ? '✕' : '✎'}
+                        </button>
+                        <button className="btn-danger" style={{padding:'3px 8px',fontSize:11}}
+                          onClick={()=>cancelarLanc(l)}>✕</button>
+                      </div>
+                    )}
+                    {l.cancelado && <div style={{fontSize:10,color:'var(--ink-4)'}}>removido</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
