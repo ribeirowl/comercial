@@ -1752,72 +1752,105 @@ function CampanhaRanking({ campanha, state }) {
 
 // ── LANÇAMENTO DE PONTOS DA CAMPANHA (gerência) ───────────────────────────────
 function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser }) {
-  const { vendedores, lojas = [] } = state;
+  const { vendedores, lancamentos } = state;
 
   const campLojaIds = (campanha.lojaIds || []).map(Number);
   const vendDisp = vendedores.filter(v =>
     v.ativo && (campLojaIds.length === 0 || campLojaIds.includes(Number(v.lojaId)))
-  );
+  ).sort((a,b) => a.nome.localeCompare(b.nome));
 
-  const [sel, setSel] = useState({ vendedorId:'', criterioId:'', obs:'' });
+  const [sel, setSel] = useState({ vendedorId:'', criterioId:'', obs:'', pontos:'' });
 
   const critSel = sel.criterioId
     ? campanha.criteriosConfig.find(c => String(c.criterioId) === String(sel.criterioId))
     : null;
 
+  // Ao trocar o critério, preenche os pontos padrão
+  const setCriterio = (criterioId) => {
+    const c = campanha.criteriosConfig.find(cc => String(cc.criterioId) === String(criterioId));
+    setSel(p => ({ ...p, criterioId, pontos: c ? String(c.pontos) : '' }));
+  };
+
+  const pontosNum = Number(sel.pontos) || 0;
+
   const lancar = () => {
     if (!sel.vendedorId) { addToast('Selecione um vendedor.', 'error'); return; }
     if (!sel.criterioId) { addToast('Selecione um critério.', 'error'); return; }
-    if (!critSel)        { addToast('Critério inválido.', 'error'); return; }
+    if (pontosNum <= 0)  { addToast('Informe os pontos.', 'error'); return; }
 
+    const vNome = vendedores.find(v => v.id === Number(sel.vendedorId))?.nome || 'vendedor';
     dispatch({ type:'ADD_LANCAMENTO', payload:{
       id: Date.now(),
       vendedorId: Number(sel.vendedorId),
       criterioId: Number(sel.criterioId),
-      pontos: critSel.pontos,
+      pontos: pontosNum,
       data: new Date().toISOString(),
       obs: sel.obs || `Campanha: ${campanha.nome}`,
       lancadoPor: currentUser?.username || '',
     }});
-    addToast(`${critSel.pontos} pts lançados para ${vendedores.find(v=>v.id===Number(sel.vendedorId))?.nome||'vendedor'}.`, 'success');
-    setSel({ vendedorId:'', criterioId:'', obs:'' });
+    addToast(`${pontosNum} pts lançados para ${vNome}.`, 'success');
+    setSel(p => ({ ...p, vendedorId:'', obs:'' }));
   };
 
+  // Ranking ao vivo calculado localmente
+  const start = new Date(campanha.dataInicio);
+  const end   = new Date(campanha.dataFim);
+  const campPtsMap = {};
+  (campanha.criteriosConfig||[]).forEach(c => { if(c.criterioId) campPtsMap[c.criterioId] = c.pontos; });
+  const criterioIds = Object.keys(campPtsMap).map(Number);
+
+  const liveRank = useMemo(() => {
+    return vendDisp.map(v => {
+      const pts = lancamentos.filter(l =>
+        l.vendedorId === v.id && !l.cancelado &&
+        criterioIds.includes(l.criterioId) &&
+        new Date(l.data) >= start && new Date(l.data) <= end
+      ).reduce((s, l) => s + (campPtsMap[l.criterioId] ?? l.pontos), 0);
+      return { ...v, pts };
+    }).sort((a,b) => b.pts - a.pts);
+  }, [vendDisp, lancamentos, campanha]);
+
   const now = new Date();
-  const isAtiva = now >= new Date(campanha.dataInicio) && now <= new Date(campanha.dataFim);
+  const isAtiva = now >= start && now <= end;
+  const maxPts = liveRank[0]?.pts || 1;
 
   return (
-    <div style={{
-      borderTop:'1px solid var(--rule)', paddingTop:14, marginTop:4,
-    }}>
+    <div style={{ borderTop:'1px solid var(--rule)', paddingTop:16, marginTop:4 }}>
+      {/* Formulário de lançamento */}
       <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>
         Lançar pontos da campanha
       </div>
       {!isAtiva && (
-        <div style={{fontSize:12,color:'var(--ink-4)',fontStyle:'italic',marginBottom:8}}>
-          {now < new Date(campanha.dataInicio) ? 'Campanha ainda não iniciou.' : 'Campanha encerrada — lançamentos fora do período não contam no ranking.'}
+        <div style={{fontSize:11,color:'var(--ink-4)',fontStyle:'italic',marginBottom:8}}>
+          {now < start ? '⚠ Campanha ainda não iniciou.' : '⚠ Campanha encerrada — lançamentos não entram no ranking.'}
         </div>
       )}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
+      <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.2fr 80px 1fr auto',gap:8,alignItems:'flex-end',marginBottom:20}}>
         <div className="field-group">
           <label className="field-label">Vendedor</label>
           <select className="field-input" style={{fontSize:12}} value={sel.vendedorId}
             onChange={e=>setSel(p=>({...p,vendedorId:e.target.value}))}>
             <option value="">Selecione...</option>
-            {vendDisp.sort((a,b)=>a.nome.localeCompare(b.nome)).map(v=>(
-              <option key={v.id} value={v.id}>{v.nome}</option>
-            ))}
+            {vendDisp.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
           </select>
         </div>
         <div className="field-group">
           <label className="field-label">Critério</label>
           <select className="field-input" style={{fontSize:12}} value={sel.criterioId}
-            onChange={e=>setSel(p=>({...p,criterioId:e.target.value}))}>
+            onChange={e=>setCriterio(e.target.value)}>
             <option value="">Selecione...</option>
-            {campanha.criteriosConfig.map(c=>(
+            {campanha.criteriosConfig.map(c => (
               <option key={c.criterioId} value={c.criterioId}>{c.nome} — {c.pontos} pts</option>
             ))}
           </select>
+        </div>
+        <div className="field-group">
+          <label className="field-label">Pontos</label>
+          <input type="number" min={1} className="field-input"
+            style={{fontSize:13,fontWeight:700,textAlign:'center'}}
+            value={sel.pontos}
+            onChange={e=>setSel(p=>({...p,pontos:e.target.value}))}
+            onKeyDown={e=>e.key==='Enter'&&lancar()}/>
         </div>
         <div className="field-group">
           <label className="field-label">Observação (opcional)</label>
@@ -1825,10 +1858,50 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
             onChange={e=>setSel(p=>({...p,obs:e.target.value}))}
             onKeyDown={e=>e.key==='Enter'&&lancar()}/>
         </div>
-        <button className="btn-primary" style={{padding:'8px 18px',fontSize:12,alignSelf:'flex-end'}} onClick={lancar}>
-          {critSel ? `Lançar ${critSel.pontos} pts` : 'Lançar'}
+        <button className="btn-primary"
+          style={{padding:'8px 18px',fontSize:12,alignSelf:'flex-end',whiteSpace:'nowrap'}}
+          onClick={lancar}>
+          {pontosNum > 0 ? `Lançar ${pontosNum} pts` : 'Lançar'}
         </button>
       </div>
+
+      {/* Ranking ao vivo */}
+      <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>
+        Ranking ao vivo
+      </div>
+      {liveRank.every(v => v.pts === 0) ? (
+        <div style={{fontSize:12,color:'var(--ink-4)',fontStyle:'italic'}}>Nenhum ponto lançado ainda.</div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          {liveRank.filter(v => v.pts > 0).map((v, i) => (
+            <div key={v.id} style={{
+              display:'grid', gridTemplateColumns:'32px 1fr 1fr 56px',
+              alignItems:'center', gap:8, padding:'6px 0',
+              borderBottom: i < liveRank.filter(x=>x.pts>0).length - 1 ? '1px solid var(--rule)' : 'none',
+            }}>
+              <div style={{
+                fontFamily:'JetBrains Mono,monospace', fontSize:11, fontWeight:700,
+                color: i===0 ? 'var(--brand-yellow,#f5c842)' : 'var(--ink-3)',
+              }}>{String(i+1).padStart(2,'0')}</div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <Avatar nome={v.nome} size={26} foto={v.foto} achievements={v.achievements||[]}/>
+                <span style={{fontSize:12,fontWeight: i===0 ? 700 : 400}}>{v.nome}</span>
+              </div>
+              <div style={{height:6,background:'var(--rule-strong)',borderRadius:3,overflow:'hidden'}}>
+                <div style={{
+                  height:'100%',borderRadius:3,
+                  width:`${(v.pts/maxPts)*100}%`,
+                  background: i===0 ? 'var(--brand-yellow,#f5c842)' : 'var(--accent)',
+                  transition:'width 400ms ease',
+                }}/>
+              </div>
+              <div style={{textAlign:'right',fontFamily:'JetBrains Mono,monospace',fontSize:12,fontWeight:700}}>
+                {v.pts} <span style={{fontSize:10,fontWeight:400,color:'var(--ink-4)'}}>pts</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
