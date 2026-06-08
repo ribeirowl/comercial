@@ -354,17 +354,16 @@ function pontosMes(id, lancs, refDate) {
   }).reduce((s,l)=>s+l.pontos,0);
 }
 
-function countNoMes(vid, cid, lancs) {
-  const n=new Date();
+function countNoMes(vid, cid, lancs, refDate) {
+  const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
     return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).length;
 }
 
-// Soma pontos usados no mês para um critério parcial (não conta lançamentos, soma pontos)
-function pontosNoCriterioMes(vid, cid, lancs) {
-  const n=new Date();
+function pontosNoCriterioMes(vid, cid, lancs, refDate) {
+  const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
     return l.vendedorId===vid && l.criterioId===cid && !l.cancelado && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();

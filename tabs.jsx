@@ -317,7 +317,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
   const [vid, setVid]     = useState('');
   const [resps, setResps] = useState({}); // { [cid]: { simNao: null|'sim'|'nao', pts: '' } }
   const [obs, setObs]     = useState('');
-  const [dataLanc, setDataLanc] = useState(''); // '' = hoje
+  const [mesLanc, setMesLanc] = useState(''); // '' = mês atual  (formato YYYY-MM)
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -450,10 +450,11 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     if (!selecionado) return false;
     // excluir se esgotado (limite mensal atingido)
     if (vid && c.limitesPorMes > 0) {
+      const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
       const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
       const usado = usarPontos
-        ? pontosNoCriterioMes(Number(vid), c.id, lancamentos)
-        : countNoMes(Number(vid), c.id, lancamentos);
+        ? pontosNoCriterioMes(Number(vid), c.id, lancamentos, refMes)
+        : countNoMes(Number(vid), c.id, lancamentos, refMes);
       if (usado >= c.limitesPorMes) return false;
     }
     return true;
@@ -472,15 +473,16 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         const isMetaSemanal = c.nome === 'Meta semanal atingida';
         const bonus = streak.ativo && isMetaSemanal;
         let pts = c.modo === 'simnao' ? c.pontos : Number(r.pts);
-        // blindagem: respeitar limite mensal conforme tipoLimite
+        // blindagem: respeitar limite mensal conforme tipoLimite e mês selecionado
         if (c.limitesPorMes > 0) {
+          const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
           if (c.tipoLimite === 'pontos' && c.modo === 'parcial') {
-            const usado = pontosNoCriterioMes(Number(vid), c.id, lancamentos);
+            const usado = pontosNoCriterioMes(Number(vid), c.id, lancamentos, refMes);
             const restante = c.limitesPorMes - usado;
             if (restante <= 0) return;
             pts = Math.min(pts, restante);
           } else {
-            const usado = countNoMes(Number(vid), c.id, lancamentos);
+            const usado = countNoMes(Number(vid), c.id, lancamentos, refMes);
             if (usado >= c.limitesPorMes) return;
           }
         }
@@ -490,14 +492,14 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         dispatch({ type: 'ADD_LANCAMENTO', payload: {
           id: maxId, vendedorId: Number(vid), criterioId: c.id,
           pontos: pts, obs: obs.trim(),
-          data: dataLanc ? new Date(dataLanc + 'T12:00:00').toISOString() : new Date().toISOString(),
+          data: mesLanc ? new Date(mesLanc + '-15T12:00:00').toISOString() : new Date().toISOString(),
           streakAplicado: bonus,
           lancadoPor: currentUser?.username || null,
         }});
       });
       setLoading(false); setSuccess(true);
       addToast(`+${total} pts lançados para ${nomeFirst(vendedor.nome)} (${prontos.length} critério${prontos.length>1?'s':''}).`, 'success');
-      setTimeout(() => { setSuccess(false); setVid(''); setResps({}); setObs(''); setDataLanc(''); }, 1600);
+      setTimeout(() => { setSuccess(false); setVid(''); setResps({}); setObs(''); }, 1600);
     }, 500);
   };
 
@@ -576,11 +578,12 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
               <div className="lanc-lista">
                 {criterios.filter(c => !c.oculto).map(c => {
                   const r = resps[c.id] || {};
+                  const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
                   const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
                   const usadoMes = c.limitesPorMes > 0
                     ? (usarPontos
-                        ? pontosNoCriterioMes(Number(vid), c.id, lancamentos)
-                        : countNoMes(Number(vid), c.id, lancamentos))
+                        ? pontosNoCriterioMes(Number(vid), c.id, lancamentos, refMes)
+                        : countNoMes(Number(vid), c.id, lancamentos, refMes))
                     : 0;
                   const limRest = c.limitesPorMes > 0 ? c.limitesPorMes - usadoMes : null;
                   const esgotado = limRest !== null && limRest <= 0;
@@ -649,19 +652,19 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
               </div>
 
               <div className="field-group" style={{marginTop:12}}>
-                <label className="field-label">Data do lançamento</label>
+                <label className="field-label">Mês de referência</label>
                 <input
-                  type="date"
+                  type="month"
                   className="field-input"
-                  value={dataLanc}
-                  max={new Date().toISOString().slice(0,10)}
-                  onChange={e => setDataLanc(e.target.value)}
+                  value={mesLanc}
+                  max={new Date().toISOString().slice(0,7)}
+                  onChange={e => setMesLanc(e.target.value)}
                   style={{width:'100%'}}
                 />
-                {dataLanc && (
-                  <div style={{marginTop:4,fontSize:11,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace'}}>
-                    Lançando com data retroativa: {new Date(dataLanc+'T12:00:00').toLocaleDateString('pt-BR')}
-                    {' '}· <button className="btn-ghost" style={{fontSize:11,padding:'0 4px'}} onClick={()=>setDataLanc('')}>usar hoje</button>
+                {mesLanc && (
+                  <div style={{marginTop:4,fontSize:11,color:'var(--accent)',fontFamily:'JetBrains Mono,monospace'}}>
+                    Lançando em: {new Date(mesLanc+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
+                    {' '}· <button className="btn-ghost" style={{fontSize:11,padding:'0 4px'}} onClick={()=>setMesLanc('')}>usar mês atual</button>
                   </div>
                 )}
               </div>

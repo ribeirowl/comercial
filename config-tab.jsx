@@ -400,6 +400,10 @@ function UsuariosSubtab({ state, dispatch, addToast, currentUser }) {
     }
     if (!window.confirm(`Remover usuário "${u.username}"?`)) return;
     dispatch({ type: 'REMOVE_USUARIO', payload: u.id });
+    // Se for vendedor, desativa o registro do vendedor para sair do ranking
+    if (u.role === 'vendedor' && u.vendedorId) {
+      dispatch({ type: 'UPDATE_VENDEDOR', payload: { id: u.vendedorId, changes: { ativo: false } } });
+    }
     addToast('Usuário removido.', 'info');
   };
 
