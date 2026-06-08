@@ -1802,7 +1802,7 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
   }, [vendDisp, lancamentos, campanha]);
 
   const now = new Date();
-  const isAtiva = now >= start && now <= end;
+  const isAtiva = now >= new Date(campanha.dataInicio) && now <= new Date(campanha.dataFim);
   const maxPts = liveRank[0]?.pts || 1;
 
   return (
