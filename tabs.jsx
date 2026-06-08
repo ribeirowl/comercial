@@ -1825,7 +1825,8 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
           {now < start ? '⚠ Campanha ainda não iniciou.' : '⚠ Campanha encerrada — lançamentos não entram no ranking.'}
         </div>
       )}
-      <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.2fr 80px 1fr auto',gap:8,alignItems:'flex-end',marginBottom:20}}>
+      {/* Linha 1: Vendedor + Critério */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
         <div className="field-group">
           <label className="field-label">Vendedor</label>
           <select className="field-input" style={{fontSize:12}} value={sel.vendedorId}
@@ -1844,10 +1845,14 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
             ))}
           </select>
         </div>
+      </div>
+      {/* Linha 2: Pontos + Observação + Botão */}
+      <div style={{display:'grid',gridTemplateColumns:'120px 1fr auto',gap:8,alignItems:'flex-end',marginBottom:20}}>
         <div className="field-group">
           <label className="field-label">Pontos</label>
           <input type="number" min={1} className="field-input"
-            style={{fontSize:13,fontWeight:700,textAlign:'center'}}
+            style={{fontSize:18,fontWeight:700,textAlign:'center',color:'var(--accent)',letterSpacing:'.02em'}}
+            placeholder="0"
             value={sel.pontos}
             onChange={e=>setSel(p=>({...p,pontos:e.target.value}))}
             onKeyDown={e=>e.key==='Enter'&&lancar()}/>
@@ -1859,7 +1864,7 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
             onKeyDown={e=>e.key==='Enter'&&lancar()}/>
         </div>
         <button className="btn-primary"
-          style={{padding:'8px 18px',fontSize:12,alignSelf:'flex-end',whiteSpace:'nowrap'}}
+          style={{padding:'10px 22px',fontSize:13,fontWeight:700,alignSelf:'flex-end',whiteSpace:'nowrap'}}
           onClick={lancar}>
           {pontosNum > 0 ? `Lançar ${pontosNum} pts` : 'Lançar'}
         </button>
