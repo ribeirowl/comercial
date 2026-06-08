@@ -1628,8 +1628,17 @@ function CampanhaRanking({ campanha, state }) {
     (campanha.criteriosConfig || []).map(c => c.criterioId).filter(Boolean),
   [campanha]);
 
+  // Filtro de loja da campanha ([] = todas)
+  const campLojaIds = useMemo(() =>
+    (campanha.lojaIds||[]).map(Number),
+  [campanha]);
+
+  const vendFiltrados = useMemo(() =>
+    vendedores.filter(v => v.ativo && (campLojaIds.length === 0 || campLojaIds.includes(Number(v.lojaId)))),
+  [vendedores, campLojaIds]);
+
   const vendRank = useMemo(() => {
-    return vendedores.filter(v => v.ativo).map(v => {
+    return vendFiltrados.map(v => {
       const pts = lancamentos.filter(l =>
         l.vendedorId === v.id && !l.cancelado &&
         criterioIds.includes(l.criterioId) &&
@@ -1637,11 +1646,14 @@ function CampanhaRanking({ campanha, state }) {
       ).reduce((s, l) => s + (campPontosMap[l.criterioId] ?? l.pontos), 0);
       return { ...v, pts };
     }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [vendedores, lancamentos, campanha, criterioIds, campPontosMap]);
+  }, [vendFiltrados, lancamentos, campanha, criterioIds, campPontosMap]);
 
   const lojaRank = useMemo(() => {
     if (!campanha.mostrarLojas) return [];
-    return lojas.map(loja => {
+    const lojasAlvo = campLojaIds.length > 0
+      ? lojas.filter(l => campLojaIds.includes(Number(l.id)))
+      : lojas;
+    return lojasAlvo.map(loja => {
       const vs = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
       const total = vs.reduce((s,v) => {
         return s + lancamentos.filter(l =>
@@ -1652,12 +1664,12 @@ function CampanhaRanking({ campanha, state }) {
       }, 0);
       return { ...loja, pts: vs.length ? Math.round(total / vs.length) : 0, vAtivos: vs.length };
     }).filter(l => l.pts > 0).sort((a,b) => b.pts - a.pts);
-  }, [lojas, vendedores, lancamentos, campanha, criterioIds, campPontosMap]);
+  }, [lojas, vendedores, lancamentos, campanha, criterioIds, campPontosMap, campLojaIds]);
 
   const cursosRank = useMemo(() => {
     if (!campanha.mostrarCursos) return [];
     const comps = comprovantes || [];
-    return vendedores.filter(v => v.ativo).map(v => {
+    return vendFiltrados.map(v => {
       const aprovados = comps.filter(c =>
         c.status === 'aprovado' && Number(c.vendedorId) === v.id &&
         new Date(c.data) >= start && new Date(c.data) <= end
@@ -1739,20 +1751,35 @@ function CampanhaRanking({ campanha, state }) {
 }
 
 function CampanhasTab({ state, dispatch, addToast, currentUser }) {
-  const { criterios, campanhas = [], vendedores } = state;
+  const { criterios, campanhas = [], vendedores, lojas = [] } = state;
   const isGerencia = currentUser?.role === 'gerencia';
+
+  // Loja do usuário atual (vendedor)
+  const myVendedor = vendedores.find(v => v.id === currentUser?.vendedorId);
+  const myLojaId   = myVendedor ? Number(myVendedor.lojaId) : null;
+
+  // Campanha visível: sem restrição de loja, ou loja do user está na lista
+  const campanhasVisiveis = useMemo(() => {
+    return campanhas.filter(c => {
+      if (isGerencia) return true; // gerência vê tudo
+      if (!c.lojaIds || c.lojaIds.length === 0) return true; // sem restrição
+      return myLojaId && c.lojaIds.map(Number).includes(myLojaId);
+    });
+  }, [campanhas, isGerencia, myLojaId]);
 
   const EMPTY_FORM = {
     nome:'', descricao:'',
     dataInicio: new Date().toISOString().slice(0,10),
     dataFim: '',
-    criteriosConfig: [], // [{criterioId, nome, pontos}]
+    criteriosConfig: [],
+    lojaIds: [], // [] = todas as lojas
     premiacoes: [
       { posicao:1, descricao:'Campeão', icone:'🏆', cor:'#FFD700' },
     ],
     mostrarVendedores: true, mostrarLojas: false, mostrarCursos: false,
   };
   const [novoCrit, setNovoCrit] = useState({ nome:'', pontos:'' });
+  const [iconPickerIdx, setIconPickerIdx] = useState(null); // índice do premio com picker aberto
   const [form, setForm]         = useState(EMPTY_FORM);
   const [editId, setEditId]     = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -1835,6 +1862,7 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
       dataFim: c.dataFim.slice(0,10),
       criteriosConfig: c.criteriosConfig || [],
       premiacoes: c.premiacoes,
+      lojaIds: c.lojaIds || [],
       mostrarVendedores: c.mostrarVendedores,
       mostrarLojas: c.mostrarLojas,
       mostrarCursos: c.mostrarCursos,
@@ -1885,7 +1913,7 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
     setAwardModal(null);
   };
 
-  const sorted = [...campanhas].sort((a,b) => {
+  const sorted = [...campanhasVisiveis].sort((a,b) => {
     const ord = { ativa:0, futura:1, encerrada:2 };
     return ord[campStatus(a)] - ord[campStatus(b)];
   });
@@ -1984,6 +2012,25 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
           </div>
 
           <div className="field-group" style={{marginBottom:12}}>
+            <label className="field-label">Lojas participantes <span style={{color:'var(--ink-4)',fontWeight:400}}>(vazio = todas)</span></label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
+              {lojas.map(l => {
+                const sel = form.lojaIds.map(Number).includes(Number(l.id));
+                return (
+                  <button key={l.id}
+                    className={`seg-btn${sel?' active':''}`}
+                    style={{fontSize:11}}
+                    onClick={() => setF('lojaIds', sel
+                      ? form.lojaIds.filter(id => Number(id) !== Number(l.id))
+                      : [...form.lojaIds, Number(l.id)])}>
+                    {l.nome}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="field-group" style={{marginBottom:12}}>
             <label className="field-label">Rankings a exibir</label>
             <div style={{display:'flex',gap:8,marginTop:4}}>
               {[['mostrarVendedores','Vendedores'],['mostrarLojas','Unidades'],['mostrarCursos','Cursos']].map(([k,l])=>(
@@ -1997,12 +2044,55 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
               Posições premiadas
               <button className="btn-ghost" style={{fontSize:11,padding:'2px 8px'}} onClick={addPremio}>+ Posição</button>
             </label>
+            {/* Icon picker overlay */}
+            {iconPickerIdx !== null && (
+              <div style={{position:'relative',zIndex:50}}>
+                <div style={{position:'fixed',inset:0}} onClick={()=>setIconPickerIdx(null)}/>
+                <div style={{
+                  position:'absolute',left:0,top:4,zIndex:51,
+                  background:'var(--paper)',border:'1px solid var(--rule-strong)',
+                  borderRadius:10,padding:12,boxShadow:'0 8px 24px rgba(0,0,0,.35)',
+                  width:300,
+                }}>
+                  {[
+                    {cat:'Troféus',  icons:['🏆','🥇','🥈','🥉','🎖️','🏅','👑','💎']},
+                    {cat:'Energia',  icons:['🔥','⚡','💥','🌟','⭐','💫','☄️','✨']},
+                    {cat:'Poder',    icons:['🦁','🐯','🦅','🐺','🦊','🦈','🐉','💪']},
+                    {cat:'Esporte',  icons:['🎯','🏹','🚀','🎳','🏆','🤺','⚽','🏀']},
+                    {cat:'Símbolos', icons:['🔱','⚜️','🌊','❄️','🌪️','💯','🎗️','🌠']},
+                  ].map(({cat,icons}) => (
+                    <div key={cat} style={{marginBottom:8}}>
+                      <div style={{fontSize:9,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace',textTransform:'uppercase',marginBottom:4}}>{cat}</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                        {icons.map(ic => (
+                          <button key={ic}
+                            style={{
+                              fontSize:20,padding:'4px 6px',borderRadius:6,border:'1px solid transparent',
+                              background: form.premiacoes[iconPickerIdx]?.icone===ic ? 'var(--paper-2)' : 'none',
+                              cursor:'pointer',
+                              borderColor: form.premiacoes[iconPickerIdx]?.icone===ic ? 'var(--rule-strong)' : 'transparent',
+                            }}
+                            onClick={()=>{ setPremio(iconPickerIdx,'icone',ic); setIconPickerIdx(null); }}>
+                            {ic}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:6}}>
               {form.premiacoes.map((pm,i) => (
-                <div key={i} style={{display:'grid',gridTemplateColumns:'40px 1fr 1fr 60px 40px',gap:8,alignItems:'center'}}>
+                <div key={i} style={{display:'grid',gridTemplateColumns:'40px 1fr 48px 60px 40px',gap:8,alignItems:'center'}}>
                   <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,textAlign:'center',color:'var(--ink-3)'}}>{pm.posicao}º</div>
                   <input className="field-input" placeholder="Nome do prêmio (ex: Campeão)" value={pm.descricao} onChange={e=>setPremio(i,'descricao',e.target.value)} style={{fontSize:12}}/>
-                  <input className="field-input" placeholder="Ícone (emoji)" value={pm.icone} onChange={e=>setPremio(i,'icone',e.target.value)} style={{fontSize:16,textAlign:'center'}}/>
+                  <button
+                    style={{fontSize:22,height:36,borderRadius:6,border:'1px solid var(--rule-strong)',background:'var(--paper-2)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}
+                    onClick={()=>setIconPickerIdx(iconPickerIdx===i?null:i)}
+                    title="Escolher ícone">
+                    {pm.icone||'🏆'}
+                  </button>
                   <input type="color" value={pm.cor} onChange={e=>setPremio(i,'cor',e.target.value)} style={{height:36,padding:2,borderRadius:4,border:'1px solid var(--rule-strong)',background:'none',cursor:'pointer',width:'100%'}}/>
                   <button className="btn-danger" style={{padding:'4px'}} onClick={()=>removePremio(i)}>×</button>
                 </div>
@@ -2059,6 +2149,11 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
                 <div className="camp-card-meta">
                   <span>{new Date(c.dataInicio).toLocaleDateString('pt-BR')} → {new Date(c.dataFim).toLocaleDateString('pt-BR')}</span>
                   <span>· {(c.criteriosConfig||[]).length} critério{(c.criteriosConfig||[]).length!==1?'s':''}</span>
+                  {c.lojaIds && c.lojaIds.length > 0 && (
+                    <span style={{color:'var(--accent)'}}>· {c.lojaIds.length === 1
+                      ? (lojas.find(l=>Number(l.id)===Number(c.lojaIds[0]))?.nome||'1 loja')
+                      : `${c.lojaIds.length} lojas`}</span>
+                  )}
                   {c.premiacoes.length > 0 && <span>· {c.premiacoes.map(p=>p.icone).join('')} {c.premiacoes.length} premiação{c.premiacoes.length!==1?'ões':''}</span>}
                 </div>
               </div>
