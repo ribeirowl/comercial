@@ -471,7 +471,7 @@ function App() {
   if (!currentUser) {
     return (
       <div className="app-shell">
-        <LoginScreen onLogin={handleLogin} state={state} logoSrc={logoSrc}/>
+        <LoginScreen onLogin={handleLogin} state={state} logoSrc={logoDarkSrc}/>
         <ToastContainer toasts={toasts}/>
         <SecurityCamera/>
       </div>
