@@ -447,12 +447,16 @@ function App() {
 
   // Hooks devem vir antes de qualquer return condicional
   const stateView = useMemo(() => {
-    if (!viewDate) return state;
-    const cutoff = viewDate + 'T23:59:59.999Z';
-    return {
+    const base = viewDate ? {
       ...state,
-      lancamentos:  state.lancamentos.filter(l  => l.data  <= cutoff),
-      comprovantes: (state.comprovantes||[]).filter(c => c.data <= cutoff),
+      lancamentos:  state.lancamentos.filter(l  => l.data  <= viewDate + 'T23:59:59.999Z'),
+      comprovantes: (state.comprovantes||[]).filter(c => c.data <= viewDate + 'T23:59:59.999Z'),
+    } : state;
+    // Ranking geral: exclui lançamentos de campanha (campanhaId definido)
+    return {
+      ...base,
+      lancamentos: (base.lancamentos||[]).filter(l => !l.campanhaId),
+      lancamentosCompletos: base.lancamentos || [], // inclui campanha (usado no FeedTab e CampanhasTab)
     };
   }, [state, viewDate]);
 
@@ -520,7 +524,7 @@ function App() {
             viewDate={viewDate}
           />
         )}
-        {tab===3 && <FeedTab state={stateView} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
+        {tab===3 && <FeedTab state={{...stateView, lancamentos: stateView.lancamentosCompletos}} dispatch={dispatch} addToast={addToast} currentUser={currentUser}/>}
         {tab===5 && (
           <PerfilTab
             state={state}
@@ -547,7 +551,7 @@ function App() {
         )}
         {tab===7 && (
           <CampanhasTab
-            state={state}
+            state={{...state, lancamentos: state.lancamentos}}
             dispatch={dispatch}
             addToast={addToast}
             currentUser={currentUser}
