@@ -193,7 +193,7 @@ tr.leader td.pts{color:#c9921a}
                 </span>
               </div>
               <div className="rk-cell">
-                <Avatar nome={v.nome} size={40} foto={v.foto}/>
+                <Avatar nome={v.nome} size={40} foto={v.foto} achievements={v.achievements}/>
               </div>
               <div className="rk-cell">
                 <div className="rk-name-main">{v.nome}</div>
@@ -534,7 +534,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                 <div className="comp-pending-info">
                   <div className="comp-pending-nome">{comp.nome}</div>
                   <div className="comp-pending-meta">
-                    <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
+                    <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto} achievements={v?.achievements||[]}/>
                     <span>{v?.nome||'?'}</span>
                     <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
                     <span style={{color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace',fontSize:10}}>
@@ -565,7 +565,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
 
           {vendedor && (
             <div className="vendor-preview">
-              <Avatar nome={vendedor.nome} size={34} foto={vendedor.foto}/>
+              <Avatar nome={vendedor.nome} size={34} foto={vendedor.foto} achievements={vendedor.achievements||[]}/>
               <div>
                 <div style={{fontFamily:'DM Sans,sans-serif',fontWeight:600,fontSize:14}}>{vendedor.nome}</div>
                 {streak.ativo && <StreakBadge semanas={streak.semanas}/>}
@@ -694,7 +694,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                 const c = criterios.find(x => x.id === l.criterioId);
                 return (
                   <div key={l.id} className="history-item">
-                    <Avatar nome={v?.nome||'?'} size={32} foto={v?.foto}/>
+                    <Avatar nome={v?.nome||'?'} size={32} foto={v?.foto} achievements={v?.achievements||[]}/>
                     <div className="history-info">
                       <div className="history-name">{v ? nomeCurto(v.nome) : '?'}</div>
                       <div className="history-crit">{c?.nome}</div>
@@ -738,7 +738,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                   <div className="comp-pending-info">
                     <div className="comp-pending-nome">{comp.nome}</div>
                     <div className="comp-pending-meta">
-                      <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto}/>
+                      <Avatar nome={v?.nome||'?'} size={18} foto={v?.foto} achievements={v?.achievements||[]}/>
                       <span>{v?.nome||'?'}</span>
                       <span style={{color:'var(--ink-4)'}}>· {fmtData(comp.data)}</span>
                       <span className={`comp-status-badge ${st}`} style={{marginLeft:4}}>
@@ -1265,7 +1265,7 @@ function FeedTab({ state, dispatch, addToast, currentUser }) {
             const confirming = confirmRemoveFeed === l.id;
             return (
               <div key={l.id} className={`feed-item${l.cancelado?' cancelado':''}`}>
-                <Avatar nome={v?.nome||'?'} size={36} foto={v?.foto}/>
+                <Avatar nome={v?.nome||'?'} size={36} foto={v?.foto} achievements={v?.achievements||[]}/>
                 <div className="feed-item-info">
                   <div>
                     <span className="feed-item-name">{v?.nome||'?'}</span>
@@ -1585,10 +1585,423 @@ function CursosTab({ state, dispatch, addToast, currentUser }) {
   );
 }
 
+// ── CAMPANHAS TAB ─────────────────────────────────────────────────────────────
+const ACHIEVEMENT_FRAMES = [
+  { id:'gold',   label:'Ouro',   color:'#FFD700', glow:'rgba(255,215,0,0.7)' },
+  { id:'silver', label:'Prata',  color:'#C0C0C0', glow:'rgba(192,192,192,0.7)' },
+  { id:'bronze', label:'Bronze', color:'#CD7F32', glow:'rgba(205,127,50,0.7)' },
+  { id:'fire',   label:'Fogo',   color:'#FF4500', glow:'rgba(255,69,0,0.7)' },
+  { id:'ice',    label:'Gelo',   color:'#00BFFF', glow:'rgba(0,191,255,0.7)' },
+  { id:'purple', label:'Roxo',   color:'#9B59B6', glow:'rgba(155,89,182,0.7)' },
+];
+
+function AchievementBadge({ ach, size = 'md' }) {
+  const s = size === 'sm' ? 22 : 32;
+  return (
+    <div title={`${ach.nome}${ach.campanhaName ? ' · ' + ach.campanhaName : ''}`}
+      style={{
+        display:'inline-flex', alignItems:'center', justifyContent:'center',
+        width: s, height: s, borderRadius:'50%',
+        background: `radial-gradient(circle, ${ach.cor}33, ${ach.cor}99)`,
+        border: `2px solid ${ach.cor}`,
+        boxShadow: `0 0 6px ${ach.cor}88`,
+        fontSize: s * 0.55, cursor:'default', flexShrink:0,
+      }}>
+      {ach.icone}
+    </div>
+  );
+}
+
+function CampanhaRanking({ campanha, state }) {
+  const { vendedores, lancamentos, lojas, comprovantes } = state;
+  const start = new Date(campanha.dataInicio);
+  const end   = new Date(campanha.dataFim + (campanha.dataFim.length === 10 ? 'T23:59:59Z' : ''));
+
+  const vendRank = useMemo(() => {
+    return vendedores.filter(v => v.ativo).map(v => {
+      const pts = lancamentos.filter(l =>
+        l.vendedorId === v.id && !l.cancelado &&
+        campanha.criterioIds.includes(l.criterioId) &&
+        new Date(l.data) >= start && new Date(l.data) <= end
+      ).reduce((s,l) => s+l.pontos, 0);
+      return { ...v, pts };
+    }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
+  }, [vendedores, lancamentos, campanha]);
+
+  const lojaRank = useMemo(() => {
+    if (!campanha.mostrarLojas) return [];
+    return lojas.map(loja => {
+      const vs = vendedores.filter(v => v.ativo && Number(v.lojaId) === Number(loja.id));
+      const total = vs.reduce((s,v) => {
+        return s + lancamentos.filter(l =>
+          l.vendedorId === v.id && !l.cancelado &&
+          campanha.criterioIds.includes(l.criterioId) &&
+          new Date(l.data) >= start && new Date(l.data) <= end
+        ).reduce((ss,l) => ss+l.pontos, 0);
+      }, 0);
+      return { ...loja, pts: vs.length ? Math.round(total / vs.length) : 0, vAtivos: vs.length };
+    }).filter(l => l.pts > 0).sort((a,b) => b.pts - a.pts);
+  }, [lojas, vendedores, lancamentos, campanha]);
+
+  const cursosRank = useMemo(() => {
+    if (!campanha.mostrarCursos) return [];
+    const comps = comprovantes || [];
+    return vendedores.filter(v => v.ativo).map(v => {
+      const aprovados = comps.filter(c =>
+        c.status === 'aprovado' && Number(c.vendedorId) === v.id &&
+        new Date(c.data) >= start && new Date(c.data) <= end
+      ).length;
+      return { ...v, aprovados };
+    }).filter(v => v.aprovados > 0).sort((a,b) => b.aprovados - a.aprovados);
+  }, [vendedores, comprovantes, campanha]);
+
+  const status = new Date() < start ? 'futura' : new Date() > end ? 'encerrada' : 'ativa';
+  const premio = (pos) => campanha.premiacoes?.find(p => p.posicao === pos);
+
+  if (vendRank.length === 0 && lojaRank.length === 0 && cursosRank.length === 0)
+    return <EmptyState msg="Nenhum ponto registrado nesta campanha ainda."/>;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:20}}>
+      {campanha.mostrarVendedores && vendRank.length > 0 && (
+        <div>
+          <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Vendedores</div>
+          <div className="rk-table">
+            {vendRank.map((v,i) => {
+              const pm = premio(i+1);
+              const maxP = vendRank[0].pts || 1;
+              return (
+                <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}>
+                  <div className="rk-cell" style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span>
+                    {pm && <span title={pm.descricao} style={{fontSize:16}}>{pm.icone}</span>}
+                  </div>
+                  <div className="rk-cell">
+                    <div className="rk-name-main">{v.nome}</div>
+                    {pm && <div style={{fontSize:10,color:'var(--accent)',fontFamily:'JetBrains Mono,monospace'}}>{pm.descricao}</div>}
+                  </div>
+                  <div className="rk-cell rk-progress-col">
+                    <ProgressBar pct={(v.pts/maxP)*100} leader={i===0}/>
+                  </div>
+                  <div className="rk-cell" style={{textAlign:'right'}}>
+                    <div className="rk-pts-main">{v.pts}</div>
+                    <span className="rk-pts-sub">pts</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {lojaRank.length > 0 && (
+        <div>
+          <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Unidades (média)</div>
+          <div className="rk-table">
+            {lojaRank.map((l,i) => (
+              <div key={l.id} className={`rk-row${i===0?' pos-1':''}`}>
+                <div className="rk-cell"><span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span></div>
+                <div className="rk-cell"><div className="rk-name-main">{l.nome}</div></div>
+                <div className="rk-cell rk-progress-col"><ProgressBar pct={(l.pts/(lojaRank[0].pts||1))*100} leader={i===0}/></div>
+                <div className="rk-cell" style={{textAlign:'right'}}><div className="rk-pts-main">{l.pts}</div><span className="rk-pts-sub">pts/vend</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {cursosRank.length > 0 && (
+        <div>
+          <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Cursos realizados</div>
+          <div className="rk-table">
+            {cursosRank.map((v,i) => (
+              <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}>
+                <div className="rk-cell"><span className={`rk-pos${i===0?' leader':''}`}>{String(i+1).padStart(2,'0')}</span></div>
+                <div className="rk-cell"><div className="rk-name-main">{v.nome}</div></div>
+                <div className="rk-cell rk-progress-col"><ProgressBar pct={(v.aprovados/(cursosRank[0].aprovados||1))*100} leader={i===0}/></div>
+                <div className="rk-cell" style={{textAlign:'right'}}><div className="rk-pts-main">{v.aprovados}</div><span className="rk-pts-sub">cursos</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CampanhasTab({ state, dispatch, addToast, currentUser }) {
+  const { criterios, campanhas = [], vendedores } = state;
+  const isGerencia = currentUser?.role === 'gerencia';
+
+  const EMPTY_FORM = {
+    nome:'', descricao:'',
+    dataInicio: new Date().toISOString().slice(0,10),
+    dataFim: '',
+    criterioIds: [],
+    premiacoes: [
+      { posicao:1, descricao:'Campeão', icone:'🏆', cor:'#FFD700' },
+    ],
+    mostrarVendedores: true, mostrarLojas: false, mostrarCursos: false,
+  };
+  const [form, setForm]         = useState(EMPTY_FORM);
+  const [editId, setEditId]     = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [awardModal, setAwardModal] = useState(null); // { campanhaId, vencedores }
+
+  const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const toggleCriterio = id => setF('criterioIds',
+    form.criterioIds.includes(id) ? form.criterioIds.filter(x=>x!==id) : [...form.criterioIds, id]
+  );
+
+  const setPremio = (idx, field, val) => setF('premiacoes',
+    form.premiacoes.map((p,i) => i===idx ? {...p, [field]:val} : p)
+  );
+
+  const addPremio = () => setF('premiacoes', [
+    ...form.premiacoes,
+    { posicao: form.premiacoes.length+1, descricao:'', icone:'🎖️', cor:'#C0C0C0' }
+  ]);
+
+  const removePremio = idx => setF('premiacoes', form.premiacoes.filter((_,i) => i!==idx));
+
+  const campStatus = c => {
+    const now = new Date();
+    if (now < new Date(c.dataInicio)) return 'futura';
+    if (now > new Date(c.dataFim + (c.dataFim.length===10?'T23:59:59Z':''))) return 'encerrada';
+    return 'ativa';
+  };
+
+  const salvar = () => {
+    if (!form.nome.trim()) { addToast('Informe o nome da campanha.', 'error'); return; }
+    if (!form.dataFim)     { addToast('Informe a data de término.', 'error'); return; }
+    if (form.criterioIds.length === 0) { addToast('Selecione ao menos um critério.', 'error'); return; }
+
+    const payload = {
+      ...form,
+      dataInicio: form.dataInicio + 'T00:00:00Z',
+      dataFim:    form.dataFim    + 'T23:59:59Z',
+      criadoPor: currentUser?.username || '',
+    };
+
+    if (editId) {
+      dispatch({ type:'UPDATE_CAMPANHA', payload:{ id: editId, changes: payload } });
+      addToast('Campanha atualizada.', 'success');
+    } else {
+      const tempId = Date.now();
+      dispatch({ type:'ADD_CAMPANHA', payload:{ id: tempId, ...payload }, _dispatch: dispatch });
+      addToast('Campanha criada!', 'success');
+    }
+    setForm(EMPTY_FORM); setEditId(null); setShowForm(false);
+  };
+
+  const editar = c => {
+    setForm({
+      nome: c.nome, descricao: c.descricao,
+      dataInicio: c.dataInicio.slice(0,10),
+      dataFim: c.dataFim.slice(0,10),
+      criterioIds: c.criterioIds,
+      premiacoes: c.premiacoes,
+      mostrarVendedores: c.mostrarVendedores,
+      mostrarLojas: c.mostrarLojas,
+      mostrarCursos: c.mostrarCursos,
+    });
+    setEditId(c.id); setShowForm(true);
+  };
+
+  const excluir = c => {
+    if (!window.confirm(`Excluir campanha "${c.nome}"?`)) return;
+    dispatch({ type:'REMOVE_CAMPANHA', payload: c.id });
+    addToast('Campanha removida.', 'info');
+  };
+
+  const premiarVencedores = (campanha) => {
+    // calcula o ranking da campanha para identificar os vencedores
+    const start = new Date(campanha.dataInicio);
+    const end   = new Date(campanha.dataFim);
+    const rank  = vendedores.filter(v => v.ativo).map(v => {
+      const pts = (state.lancamentos||[]).filter(l =>
+        l.vendedorId === v.id && !l.cancelado &&
+        campanha.criterioIds.includes(l.criterioId) &&
+        new Date(l.data) >= start && new Date(l.data) <= end
+      ).reduce((s,l) => s+l.pontos, 0);
+      return { ...v, pts };
+    }).filter(v => v.pts > 0).sort((a,b) => b.pts - a.pts);
+
+    setAwardModal({ campanha, rank });
+  };
+
+  const confirmarPremiacao = () => {
+    const { campanha, rank } = awardModal;
+    campanha.premiacoes.forEach(pm => {
+      const vencedor = rank[pm.posicao - 1];
+      if (!vencedor) return;
+      const novoAch = {
+        nome: pm.descricao || `${pm.posicao}º lugar`,
+        icone: pm.icone, cor: pm.cor,
+        campanhaId: campanha.id, campanhaName: campanha.nome,
+        data: new Date().toISOString(),
+      };
+      const novosAchs = [...(vencedor.achievements||[]), novoAch];
+      dispatch({ type:'AWARD_ACHIEVEMENT', payload:{ vendedorId: vencedor.id, achievements: novosAchs } });
+    });
+    addToast('Premiações concedidas! Achievements adicionados aos vencedores.', 'success');
+    setAwardModal(null);
+  };
+
+  const sorted = [...campanhas].sort((a,b) => {
+    const ord = { ativa:0, futura:1, encerrada:2 };
+    return ord[campStatus(a)] - ord[campStatus(b)];
+  });
+
+  return (
+    <div>
+      <SectionHeader
+        eyebrowLeft="COMPETIÇÃO"
+        eyebrowAccent="CAMPANHAS"
+        title="Tiro Curto"
+        byline="Campanhas temporárias com rankings e premiações especiais."
+      >
+        {isGerencia && (
+          <button className="btn-add" onClick={() => { setForm(EMPTY_FORM); setEditId(null); setShowForm(p=>!p); }}>
+            {showForm ? 'Cancelar' : '+ Nova campanha'}
+          </button>
+        )}
+      </SectionHeader>
+
+      {/* FORMULÁRIO */}
+      {isGerencia && showForm && (
+        <div className="form-block" style={{marginBottom:28}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+            <FieldInput label="Nome da campanha" value={form.nome} onChange={v=>setF('nome',v)} placeholder="Ex: Sprint de Junho"/>
+            <FieldInput label="Descrição (opcional)" value={form.descricao} onChange={v=>setF('descricao',v)} placeholder="Objetivo da campanha..."/>
+            <div className="field-group">
+              <label className="field-label">Data início</label>
+              <input type="date" className="field-input" value={form.dataInicio} onChange={e=>setF('dataInicio',e.target.value)}/>
+            </div>
+            <div className="field-group">
+              <label className="field-label">Data fim</label>
+              <input type="date" className="field-input" value={form.dataFim} min={form.dataInicio} onChange={e=>setF('dataFim',e.target.value)}/>
+            </div>
+          </div>
+
+          <div className="field-group" style={{marginBottom:12}}>
+            <label className="field-label">Critérios que contam nesta campanha</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
+              {criterios.filter(c=>!c.oculto).map(c => (
+                <button key={c.id}
+                  className={`seg-btn${form.criterioIds.includes(c.id)?' active':''}`}
+                  style={{fontSize:11}} onClick={()=>toggleCriterio(c.id)}>
+                  {c.nome} ({c.pontos}pts)
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field-group" style={{marginBottom:12}}>
+            <label className="field-label">Rankings a exibir</label>
+            <div style={{display:'flex',gap:8,marginTop:4}}>
+              {[['mostrarVendedores','Vendedores'],['mostrarLojas','Unidades'],['mostrarCursos','Cursos']].map(([k,l])=>(
+                <button key={k} className={`seg-btn${form[k]?' active':''}`} onClick={()=>setF(k,!form[k])}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field-group" style={{marginBottom:12}}>
+            <label className="field-label" style={{display:'flex',justifyContent:'space-between'}}>
+              Posições premiadas
+              <button className="btn-ghost" style={{fontSize:11,padding:'2px 8px'}} onClick={addPremio}>+ Posição</button>
+            </label>
+            <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:6}}>
+              {form.premiacoes.map((pm,i) => (
+                <div key={i} style={{display:'grid',gridTemplateColumns:'40px 1fr 1fr 60px 40px',gap:8,alignItems:'center'}}>
+                  <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,textAlign:'center',color:'var(--ink-3)'}}>{pm.posicao}º</div>
+                  <input className="field-input" placeholder="Nome do prêmio (ex: Campeão)" value={pm.descricao} onChange={e=>setPremio(i,'descricao',e.target.value)} style={{fontSize:12}}/>
+                  <input className="field-input" placeholder="Ícone (emoji)" value={pm.icone} onChange={e=>setPremio(i,'icone',e.target.value)} style={{fontSize:16,textAlign:'center'}}/>
+                  <input type="color" value={pm.cor} onChange={e=>setPremio(i,'cor',e.target.value)} style={{height:36,padding:2,borderRadius:4,border:'1px solid var(--rule-strong)',background:'none',cursor:'pointer',width:'100%'}}/>
+                  <button className="btn-danger" style={{padding:'4px'}} onClick={()=>removePremio(i)}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <PrimaryBtn onClick={salvar}>{editId ? 'Salvar alterações' : 'Criar campanha'}</PrimaryBtn>
+        </div>
+      )}
+
+      {/* MODAL PREMIAÇÃO */}
+      {awardModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{background:'var(--paper)',border:'2px solid var(--rule-strong)',borderRadius:12,padding:28,maxWidth:480,width:'100%'}}>
+            <div style={{fontFamily:"'Anton',sans-serif",fontSize:20,textTransform:'uppercase',marginBottom:4}}>Premiar vencedores</div>
+            <div style={{fontSize:12,color:'var(--ink-3)',marginBottom:16}}>{awardModal.campanha.nome}</div>
+            {awardModal.campanha.premiacoes.map(pm => {
+              const venc = awardModal.rank[pm.posicao-1];
+              return (
+                <div key={pm.posicao} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--rule)'}}>
+                  <span style={{fontSize:24}}>{pm.icone}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600}}>{pm.descricao || `${pm.posicao}º lugar`}</div>
+                    <div style={{fontSize:12,color:'var(--ink-3)'}}>{venc ? `${venc.nome} · ${venc.pts} pts` : 'Nenhum participante nesta posição'}</div>
+                  </div>
+                  {venc && <div style={{width:10,height:10,borderRadius:'50%',background:pm.cor,boxShadow:`0 0 8px ${pm.cor}`}}/>}
+                </div>
+              );
+            })}
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <PrimaryBtn onClick={confirmarPremiacao}>Conceder achievements</PrimaryBtn>
+              <button className="btn-ghost" onClick={()=>setAwardModal(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LISTA DE CAMPANHAS */}
+      {sorted.length === 0 && <EmptyState msg="Nenhuma campanha criada ainda."/>}
+      {sorted.map(c => {
+        const st = campStatus(c);
+        const stLabel = {ativa:'● ATIVA', futura:'◎ EM BREVE', encerrada:'○ ENCERRADA'}[st];
+        const stColor = {ativa:'var(--brand-green,#3b9e5c)', futura:'var(--accent)', encerrada:'var(--ink-4)'}[st];
+        return (
+          <div key={c.id} className="camp-card">
+            <div className="camp-card-header">
+              <div>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <div className="camp-card-nome">{c.nome}</div>
+                  <span style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',fontWeight:700,color:stColor}}>{stLabel}</span>
+                </div>
+                {c.descricao && <div className="camp-card-desc">{c.descricao}</div>}
+                <div className="camp-card-meta">
+                  <span>{new Date(c.dataInicio).toLocaleDateString('pt-BR')} → {new Date(c.dataFim).toLocaleDateString('pt-BR')}</span>
+                  <span>· {c.criterioIds.length} critério{c.criterioIds.length!==1?'s':''}</span>
+                  {c.premiacoes.length > 0 && <span>· {c.premiacoes.map(p=>p.icone).join('')} {c.premiacoes.length} premiação{c.premiacoes.length!==1?'ões':''}</span>}
+                </div>
+              </div>
+              {isGerencia && (
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  {st === 'encerrada' && c.premiacoes.length > 0 && (
+                    <button className="btn-aprovar" style={{fontSize:11,padding:'5px 12px'}} onClick={()=>premiarVencedores(c)}>
+                      🏆 Premiar
+                    </button>
+                  )}
+                  <button className="btn-ghost" style={{padding:'5px 10px',fontSize:11}} onClick={()=>editar(c)}>Editar</button>
+                  <button className="btn-danger" style={{padding:'5px 10px',fontSize:11}} onClick={()=>excluir(c)}>×</button>
+                </div>
+              )}
+            </div>
+            <div className="camp-card-body">
+              <CampanhaRanking campanha={c} state={state}/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
-window.RankingTab  = RankingTab;
-window.LancarTab   = LancarTab;
-window.VendedorTab = VendedorTab;
-window.FeedTab     = FeedTab;
-window.PerfilTab   = PerfilTab;
-window.CursosTab   = CursosTab;
+window.RankingTab     = RankingTab;
+window.LancarTab      = LancarTab;
+window.VendedorTab    = VendedorTab;
+window.FeedTab        = FeedTab;
+window.PerfilTab      = PerfilTab;
+window.CursosTab      = CursosTab;
+window.CampanhasTab   = CampanhasTab;

@@ -14,6 +14,9 @@ const _C2S = {
   streakSemanas:'streak_semanas',
   canceladoPor:'cancelado_por', canceladoEm:'cancelado_em',
   lancadoPor:'lancado_por', tipoLimite:'tipo_limite',
+  criterioIds:'criterio_ids', dataInicio:'data_inicio', dataFim:'data_fim',
+  mostrarVendedores:'mostrar_vendedores', mostrarLojas:'mostrar_lojas',
+  mostrarCursos:'mostrar_cursos', criadoPor:'criado_por',
 };
 const _S2C = Object.fromEntries(Object.entries(_C2S).map(([k,v])=>[v,k]));
 
@@ -25,7 +28,7 @@ function _fromRow(obj) {
 }
 
 async function loadFromSupabase() {
-  const [vend, crit, lanc, loja, user, comp, niv, cfg, fatM, curs] = await Promise.all([
+  const [vend, crit, lanc, loja, user, comp, niv, cfg, fatM, curs, camp] = await Promise.all([
     _sb.from('vendedores').select('*'),
     _sb.from('criterios').select('*'),
     _sb.from('lancamentos').select('*'),
@@ -36,10 +39,10 @@ async function loadFromSupabase() {
     _sb.from('app_config').select('*').eq('id',1).single(),
     _sb.from('faturamento_mensal').select('loja_id,mes,ano,faturamento,meta'),
     _sb.from('cursos').select('*').order('data', { ascending: false }),
+    _sb.from('campanhas').select('*').order('data_inicio', { ascending: false }),
   ]);
   return {
     schemaVersion:     SCHEMA_VERSION,
-    vendedores:        (vend.data||[]).map(_fromRow),
     criterios:         (crit.data||[]).map(_fromRow),
     lancamentos:       (lanc.data||[]).map(_fromRow),
     lojas:             loja.data || [],
@@ -50,6 +53,20 @@ async function loadFromSupabase() {
       id: c.id, titulo: c.titulo, link: c.link||'',
       descricao: c.descricao||'', data: c.data,
       vendedorIds: Array.isArray(c.vendedor_ids) ? c.vendedor_ids : [],
+    })),
+    campanhas: (camp.data||[]).map(c => ({
+      id: c.id, nome: c.nome, descricao: c.descricao||'',
+      dataInicio: c.data_inicio, dataFim: c.data_fim,
+      criterioIds: Array.isArray(c.criterio_ids) ? c.criterio_ids : [],
+      premiacoes: Array.isArray(c.premiacoes) ? c.premiacoes : [],
+      mostrarVendedores: c.mostrar_vendedores ?? true,
+      mostrarLojas: c.mostrar_lojas ?? false,
+      mostrarCursos: c.mostrar_cursos ?? false,
+      ativo: c.ativo ?? true, criadoPor: c.criado_por||'',
+    })),
+    vendedores: (vend.data||[]).map(v => ({
+      ..._fromRow(v),
+      achievements: Array.isArray(v.achievements) ? v.achievements : [],
     })),
     config: {
       niveis:              (niv.data||[]).map(_fromRow),
@@ -150,6 +167,43 @@ async function syncAction(action) {
         }
         break;
       }
+      case 'ADD_CAMPANHA': {
+        const { data: campRes, error: campErr } = await _sb.from('campanhas').insert({
+          nome: action.payload.nome, descricao: action.payload.descricao||'',
+          data_inicio: action.payload.dataInicio, data_fim: action.payload.dataFim,
+          criterio_ids: action.payload.criterioIds||[],
+          premiacoes: action.payload.premiacoes||[],
+          mostrar_vendedores: action.payload.mostrarVendedores??true,
+          mostrar_lojas: action.payload.mostrarLojas??false,
+          mostrar_cursos: action.payload.mostrarCursos??false,
+          ativo: action.payload.ativo??true,
+          criado_por: action.payload.criadoPor||'',
+        }).select('id').single();
+        if (campErr) { console.error('[ADD_CAMPANHA]', campErr); break; }
+        if (campRes && typeof action._dispatch === 'function')
+          action._dispatch({ type:'UPDATE_CAMPANHA', payload:{ id: action.payload.id, changes:{ id: campRes.id } } });
+        break;
+      }
+      case 'UPDATE_CAMPANHA':
+        _chk(await _sb.from('campanhas').update({
+          nome: action.payload.changes.nome,
+          descricao: action.payload.changes.descricao,
+          data_inicio: action.payload.changes.dataInicio,
+          data_fim: action.payload.changes.dataFim,
+          criterio_ids: action.payload.changes.criterioIds,
+          premiacoes: action.payload.changes.premiacoes,
+          mostrar_vendedores: action.payload.changes.mostrarVendedores,
+          mostrar_lojas: action.payload.changes.mostrarLojas,
+          mostrar_cursos: action.payload.changes.mostrarCursos,
+          ativo: action.payload.changes.ativo,
+        }).eq('id', action.payload.id), 'UPDATE_CAMPANHA'); break;
+      case 'REMOVE_CAMPANHA':
+        _chk(await _sb.from('campanhas').delete().eq('id', action.payload), 'REMOVE_CAMPANHA'); break;
+      case 'AWARD_ACHIEVEMENT':
+        // Adiciona achievement ao vendedor (merge via jsonb)
+        _chk(await _sb.from('vendedores').update({
+          achievements: action.payload.achievements,
+        }).eq('id', action.payload.vendedorId), 'AWARD_ACHIEVEMENT'); break;
       case 'REMOVE_CURSO':
         _chk(await _sb.from('cursos').delete().eq('id', action.payload), 'REMOVE_CURSO'); break;
       case 'UPDATE_CURSO':
@@ -258,6 +312,7 @@ const SEED_STATE = {
   lojas:             SEED_LOJAS,
   faturamentoMensal: [],
   cursos:            [],
+  campanhas:         [],
 };
 
 // ── REDUCER ───────────────────────────────────────────────────────────────────
@@ -272,8 +327,11 @@ function reducer(state, action) {
       if (!p.comprovantes)      p.comprovantes      = [];
       if (!p.lojas)             p.lojas             = SEED_LOJAS;
       if (!p.faturamentoMensal) p.faturamentoMensal = [];
-      if (!p.cursos)            p.cursos            = [];
+      if (!p.cursos)     p.cursos     = [];
+      if (!p.campanhas)  p.campanhas  = [];
       else p.lojas = p.lojas.map(l => ({ faturamento:0, meta:0, ...l }));
+      // garantir achievements nos vendedores
+      if (p.vendedores) p.vendedores = p.vendedores.map(v => ({ achievements:[], ...v }));
       // garante que critérios do seed existam (injeta os que faltam por id)
       SEED_CRITERIOS.forEach(sc => {
         if (!p.criterios.some(c => c.id === sc.id)) p.criterios = [...p.criterios, sc];
@@ -314,6 +372,12 @@ function reducer(state, action) {
     case 'SET_CURSOS':   return { ...state, cursos: action.payload };
     case 'REMOVE_CURSO': return { ...state, cursos:(state.cursos||[]).filter(c=>c.id!==action.payload) };
     case 'UPDATE_CURSO': return { ...state, cursos:(state.cursos||[]).map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
+    case 'ADD_CAMPANHA':    return { ...state, campanhas:[...(state.campanhas||[]), action.payload] };
+    case 'UPDATE_CAMPANHA': return { ...state, campanhas:(state.campanhas||[]).map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
+    case 'REMOVE_CAMPANHA': return { ...state, campanhas:(state.campanhas||[]).filter(c=>c.id!==action.payload) };
+    case 'AWARD_ACHIEVEMENT': return { ...state, vendedores:state.vendedores.map(v=>
+      v.id===action.payload.vendedorId ? {...v, achievements: action.payload.achievements} : v
+    )};
     case 'ADD_LOJA':    return { ...state, lojas:[...(state.lojas||[]), action.payload] };
     case 'UPDATE_LOJA': return { ...state, lojas:(state.lojas||[]).map(l=>l.id===action.payload.id?{...l,...action.payload.changes}:l) };
     case 'REMOVE_LOJA': return { ...state, lojas:(state.lojas||[]).filter(l=>l.id!==action.payload) };

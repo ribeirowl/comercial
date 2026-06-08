@@ -20,17 +20,28 @@ function CountUp({ target, duration = 900 }) {
 }
 
 // ── AVATAR ────────────────────────────────────────────────────────────────────
-function Avatar({ nome, size=40, foto=null }) {
-  if (foto) {
-    return (
-      <div className="avatar" style={{ width:size, height:size, padding:0, overflow:'hidden' }}>
-        <img src={foto} alt={nome} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
-      </div>
-    );
-  }
+function Avatar({ nome, size=40, foto=null, achievements=[] }) {
+  const lastAch = achievements && achievements.length > 0
+    ? [...achievements].sort((a,b) => new Date(b.data)-new Date(a.data))[0]
+    : null;
+
+  const baseStyle = { width:size, height:size, borderRadius:'50%', overflow:'hidden', flexShrink:0 };
+
+  const inner = foto
+    ? <div style={baseStyle}><img src={foto} alt={nome} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/></div>
+    : <div className="avatar" style={{width:size,height:size,fontSize:size*.34}}>{initials(nome)}</div>;
+
+  if (!lastAch) return inner;
+
   return (
-    <div className="avatar" style={{ width:size, height:size, fontSize:size*.34 }}>
-      {initials(nome)}
+    <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
+      {inner}
+      <div style={{
+        position:'absolute', inset:-3, borderRadius:'50%',
+        border:`3px solid ${lastAch.cor}`,
+        boxShadow:`0 0 10px ${lastAch.cor}bb, inset 0 0 4px ${lastAch.cor}33`,
+        pointerEvents:'none',
+      }} title={`${lastAch.icone} ${lastAch.nome}${lastAch.campanhaName?' · '+lastAch.campanhaName:''}`}/>
     </div>
   );
 }

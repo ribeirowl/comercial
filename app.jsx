@@ -143,7 +143,8 @@ function Masthead({ tab, setTab, currentUser, onLogout, logoSrc }) {
     { num:'04', label:'FEED',     idx:3 },
     { num:'05', label:'AJUSTES',  idx:4, roles:['gerencia'] },
     { num:'05', label:'PERFIL',   idx:5, roles:['vendedor'] },
-    { num:'06', label:'CURSOS',   idx:6 },
+    { num:'06', label:'CURSOS',    idx:6 },
+    { num:'07', label:'CAMPANHAS', idx:7 },
   ];
 
   const visibleTabs = ALL_TABS.filter(t =>
@@ -538,6 +539,14 @@ function App() {
         )}
         {tab===6 && (
           <CursosTab
+            state={state}
+            dispatch={dispatch}
+            addToast={addToast}
+            currentUser={currentUser}
+          />
+        )}
+        {tab===7 && (
+          <CampanhasTab
             state={state}
             dispatch={dispatch}
             addToast={addToast}

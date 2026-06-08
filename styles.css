@@ -1601,6 +1601,37 @@ body::before {
 }
 .history-mode-close:hover { background: rgba(0,0,0,0.25); }
 
+/* ── CAMPANHAS ───────────────────────────────────────────────────────────── */
+.camp-card {
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px; overflow: hidden;
+  margin-bottom: 20px;
+}
+.camp-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 16px 20px; background: var(--paper-2); gap: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.camp-card-nome {
+  font-family: 'Anton', sans-serif; font-size: 18px;
+  text-transform: uppercase; letter-spacing: .02em;
+}
+.camp-card-desc {
+  font-family: 'Newsreader', serif; font-style: italic;
+  font-size: 13px; color: var(--ink-3); margin-top: 2px;
+}
+.camp-card-meta {
+  display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-4);
+}
+.camp-card-body { padding: 16px 20px; }
+
+/* ── ACHIEVEMENT FRAME no avatar ─────────────────────────────────────────── */
+.avatar-ach-frame {
+  position: absolute; inset: -3px; border-radius: 50%;
+  pointer-events: none; z-index: 1;
+}
+
 /* ── SECURITY CAMERA ─────────────────────────────────────────────────────── */
 @keyframes camScan {
   0%   { transform: translateY(-100%); }
