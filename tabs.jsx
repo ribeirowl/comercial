@@ -1447,11 +1447,11 @@ function CursosTab({ state, dispatch, addToast, currentUser }) {
     if (!link.trim())   { addToast('Informe o link do curso.', 'error'); return; }
     if (!todosVend && selVids.length === 0) { addToast('Selecione ao menos um vendedor.', 'error'); return; }
     dispatch({ type:'ADD_CURSO', payload:{
-      id: Date.now() + Math.random(),
+      id: Date.now(),  // inteiro (ms), compatível com BIGINT do Supabase
       titulo: titulo.trim(), link: link.trim(),
       descricao: descricao.trim(),
       data: new Date().toISOString(),
-      vendedorIds: todosVend ? [] : selVids,
+      vendedorIds: todosVend ? [] : selVids.map(Number),
     }});
     addToast('Curso adicionado!', 'success');
     setTitulo(''); setLink(''); setDescricao(''); setSelVids([]); setTodosVend(true);
@@ -1463,9 +1463,13 @@ function CursosTab({ state, dispatch, addToast, currentUser }) {
     addToast('Curso removido.', 'info');
   };
 
+  const myVendedorId = Number(currentUser?.vendedorId);
   const meusCursos = isGerencia
     ? [...cursos].sort((a,b) => new Date(b.data)-new Date(a.data))
-    : cursos.filter(c => c.vendedorIds.length === 0 || c.vendedorIds.includes(currentUser?.vendedorId));
+    : cursos.filter(c =>
+        c.vendedorIds.length === 0 ||
+        c.vendedorIds.map(Number).includes(myVendedorId)
+      ).sort((a,b) => new Date(b.data)-new Date(a.data));
 
   return (
     <div>
