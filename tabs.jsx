@@ -1813,7 +1813,7 @@ function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser 
       </div>
       {!isAtiva && (
         <div style={{fontSize:11,color:'var(--ink-4)',fontStyle:'italic',marginBottom:8}}>
-          {now < start ? '⚠ Campanha ainda não iniciou.' : '⚠ Campanha encerrada — lançamentos não entram no ranking.'}
+          {now < new Date(campanha.dataInicio) ? '⚠ Campanha ainda não iniciou.' : '⚠ Campanha encerrada — lançamentos não entram no ranking.'}
         </div>
       )}
       {/* Linha 1: Vendedor + Critério */}
