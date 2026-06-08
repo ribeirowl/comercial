@@ -1449,13 +1449,17 @@ function CursosTab({ state, dispatch, addToast, currentUser }) {
     if (!titulo.trim()) { addToast('Informe o título do curso.', 'error'); return; }
     if (!link.trim())   { addToast('Informe o link do curso.', 'error'); return; }
     if (!todosVend && selVids.length === 0) { addToast('Selecione ao menos um vendedor.', 'error'); return; }
-    dispatch({ type:'ADD_CURSO', payload:{
-      id: Date.now(),  // inteiro (ms), compatível com BIGINT do Supabase
-      titulo: titulo.trim(), link: link.trim(),
-      descricao: descricao.trim(),
-      data: new Date().toISOString(),
-      vendedorIds: todosVend ? [] : selVids.map(Number),
-    }});
+    dispatch({
+      type:'ADD_CURSO',
+      payload:{
+        id: Date.now(),
+        titulo: titulo.trim(), link: link.trim(),
+        descricao: descricao.trim(),
+        data: new Date().toISOString(),
+        vendedorIds: todosVend ? [] : selVids.map(Number),
+      },
+      _dispatch: dispatch,
+    });
     addToast('Curso adicionado!', 'success');
     setTitulo(''); setLink(''); setDescricao(''); setSelVids([]); setTodosVend(true);
   };

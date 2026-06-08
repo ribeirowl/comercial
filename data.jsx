@@ -123,12 +123,25 @@ async function syncAction(action) {
           { onConflict: 'loja_id,mes,ano' }
         ); break;
       }
-      case 'ADD_CURSO':
-        await _sb.from('cursos').insert({
-          id: action.payload.id, titulo: action.payload.titulo,
-          link: action.payload.link, descricao: action.payload.descricao,
-          data: action.payload.data, vendedor_ids: action.payload.vendedorIds || [],
-        }); break;
+      case 'ADD_CURSO': {
+        const { data: cursosRes, error: cursosErr } = await _sb.from('cursos').insert({
+          titulo: action.payload.titulo,
+          link: action.payload.link,
+          descricao: action.payload.descricao,
+          vendedor_ids: action.payload.vendedorIds || [],
+        }).select('*');
+        if (cursosErr) { console.error('[ADD_CURSO]', cursosErr); break; }
+        // Recarrega todos os cursos do banco para ter IDs reais
+        const { data: allCursos } = await _sb.from('cursos').select('*').order('id', { ascending: false });
+        if (allCursos && typeof action._dispatch === 'function') {
+          action._dispatch({ type: 'SET_CURSOS', payload: allCursos.map(c => ({
+            id: c.id, titulo: c.titulo, link: c.link||'',
+            descricao: c.descricao||'', data: c.data,
+            vendedorIds: Array.isArray(c.vendedor_ids) ? c.vendedor_ids : [],
+          }))});
+        }
+        break;
+      }
       case 'REMOVE_CURSO':
         await _sb.from('cursos').delete().eq('id', action.payload); break;
       case 'UPDATE_CURSO':
@@ -290,6 +303,7 @@ function reducer(state, action) {
     case 'REMOVE_COMPROVANTE': return { ...state, comprovantes:state.comprovantes.filter(c=>c.id!==action.payload) };
     case 'UPDATE_COMPROVANTE': return { ...state, comprovantes:state.comprovantes.map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
     case 'ADD_CURSO':    return { ...state, cursos:[...(state.cursos||[]), action.payload] };
+    case 'SET_CURSOS':   return { ...state, cursos: action.payload };
     case 'REMOVE_CURSO': return { ...state, cursos:(state.cursos||[]).filter(c=>c.id!==action.payload) };
     case 'UPDATE_CURSO': return { ...state, cursos:(state.cursos||[]).map(c=>c.id===action.payload.id?{...c,...action.payload.changes}:c) };
     case 'ADD_LOJA':    return { ...state, lojas:[...(state.lojas||[]), action.payload] };
