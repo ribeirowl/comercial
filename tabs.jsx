@@ -1750,6 +1750,89 @@ function CampanhaRanking({ campanha, state }) {
   );
 }
 
+// ── LANÇAMENTO DE PONTOS DA CAMPANHA (gerência) ───────────────────────────────
+function LancarCampanhaPanel({ campanha, state, dispatch, addToast, currentUser }) {
+  const { vendedores, lojas = [] } = state;
+
+  const campLojaIds = (campanha.lojaIds || []).map(Number);
+  const vendDisp = vendedores.filter(v =>
+    v.ativo && (campLojaIds.length === 0 || campLojaIds.includes(Number(v.lojaId)))
+  );
+
+  const [sel, setSel] = useState({ vendedorId:'', criterioId:'', obs:'' });
+
+  const critSel = sel.criterioId
+    ? campanha.criteriosConfig.find(c => String(c.criterioId) === String(sel.criterioId))
+    : null;
+
+  const lancar = () => {
+    if (!sel.vendedorId) { addToast('Selecione um vendedor.', 'error'); return; }
+    if (!sel.criterioId) { addToast('Selecione um critério.', 'error'); return; }
+    if (!critSel)        { addToast('Critério inválido.', 'error'); return; }
+
+    dispatch({ type:'ADD_LANCAMENTO', payload:{
+      id: Date.now(),
+      vendedorId: Number(sel.vendedorId),
+      criterioId: Number(sel.criterioId),
+      pontos: critSel.pontos,
+      data: new Date().toISOString(),
+      obs: sel.obs || `Campanha: ${campanha.nome}`,
+      lancadoPor: currentUser?.username || '',
+    }});
+    addToast(`${critSel.pontos} pts lançados para ${vendedores.find(v=>v.id===Number(sel.vendedorId))?.nome||'vendedor'}.`, 'success');
+    setSel({ vendedorId:'', criterioId:'', obs:'' });
+  };
+
+  const now = new Date();
+  const isAtiva = now >= new Date(campanha.dataInicio) && now <= new Date(campanha.dataFim);
+
+  return (
+    <div style={{
+      borderTop:'1px solid var(--rule)', paddingTop:14, marginTop:4,
+    }}>
+      <div style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>
+        Lançar pontos da campanha
+      </div>
+      {!isAtiva && (
+        <div style={{fontSize:12,color:'var(--ink-4)',fontStyle:'italic',marginBottom:8}}>
+          {now < new Date(campanha.dataInicio) ? 'Campanha ainda não iniciou.' : 'Campanha encerrada — lançamentos fora do período não contam no ranking.'}
+        </div>
+      )}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:8,alignItems:'flex-end'}}>
+        <div className="field-group">
+          <label className="field-label">Vendedor</label>
+          <select className="field-input" style={{fontSize:12}} value={sel.vendedorId}
+            onChange={e=>setSel(p=>({...p,vendedorId:e.target.value}))}>
+            <option value="">Selecione...</option>
+            {vendDisp.sort((a,b)=>a.nome.localeCompare(b.nome)).map(v=>(
+              <option key={v.id} value={v.id}>{v.nome}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field-group">
+          <label className="field-label">Critério</label>
+          <select className="field-input" style={{fontSize:12}} value={sel.criterioId}
+            onChange={e=>setSel(p=>({...p,criterioId:e.target.value}))}>
+            <option value="">Selecione...</option>
+            {campanha.criteriosConfig.map(c=>(
+              <option key={c.criterioId} value={c.criterioId}>{c.nome} — {c.pontos} pts</option>
+            ))}
+          </select>
+        </div>
+        <div className="field-group">
+          <label className="field-label">Observação (opcional)</label>
+          <input className="field-input" style={{fontSize:12}} placeholder="Ex: venda especial" value={sel.obs}
+            onChange={e=>setSel(p=>({...p,obs:e.target.value}))}
+            onKeyDown={e=>e.key==='Enter'&&lancar()}/>
+        </div>
+        <button className="btn-primary" style={{padding:'8px 18px',fontSize:12,alignSelf:'flex-end'}} onClick={lancar}>
+          {critSel ? `Lançar ${critSel.pontos} pts` : 'Lançar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CampanhasTab({ state, dispatch, addToast, currentUser }) {
   const { criterios, campanhas = [], vendedores, lojas = [] } = state;
   const isGerencia = currentUser?.role === 'gerencia';
@@ -1783,7 +1866,8 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
   const [form, setForm]         = useState(EMPTY_FORM);
   const [editId, setEditId]     = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [awardModal, setAwardModal] = useState(null); // { campanhaId, vencedores }
+  const [awardModal, setAwardModal]     = useState(null);
+  const [openLaunch, setOpenLaunch]     = useState({}); // campId → bool
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -2171,6 +2255,25 @@ function CampanhasTab({ state, dispatch, addToast, currentUser }) {
             </div>
             <div className="camp-card-body">
               <CampanhaRanking campanha={c} state={state}/>
+              {isGerencia && (c.criteriosConfig||[]).length > 0 && (
+                <div style={{marginTop:12}}>
+                  <button
+                    className="btn-ghost"
+                    style={{fontSize:11,padding:'5px 12px',marginBottom: openLaunch[c.id] ? 12 : 0}}
+                    onClick={()=>setOpenLaunch(p=>({...p,[c.id]:!p[c.id]}))}>
+                    {openLaunch[c.id] ? '▲ Fechar lançamento' : '▼ Lançar pontos'}
+                  </button>
+                  {openLaunch[c.id] && (
+                    <LancarCampanhaPanel
+                      campanha={c}
+                      state={state}
+                      dispatch={dispatch}
+                      addToast={addToast}
+                      currentUser={currentUser}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
