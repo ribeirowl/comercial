@@ -329,7 +329,7 @@ function reducer(state, action) {
       if (!p.faturamentoMensal) p.faturamentoMensal = [];
       if (!p.cursos)     p.cursos     = [];
       if (!p.campanhas)  p.campanhas  = [];
-      else p.lojas = p.lojas.map(l => ({ faturamento:0, meta:0, ...l }));
+      p.lojas = (p.lojas||[]).map(l => ({ faturamento:0, meta:0, ...l }));
       // garantir achievements nos vendedores
       if (p.vendedores) p.vendedores = p.vendedores.map(v => ({ achievements:[], ...v }));
       // garante que critérios do seed existam (injeta os que faltam por id)
