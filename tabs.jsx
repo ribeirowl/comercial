@@ -45,6 +45,8 @@ function RankingTab({ state, dispatch, currentUser, viewDate }) {
     return !l.cancelado&&d.getMonth()===refDate.getMonth()&&d.getFullYear()===refDate.getFullYear() ? s+l.pontos : s;
   }, 0);
   const lancMes = lancamentos.filter(l=>{ const d=new Date(l.data); return !l.cancelado&&d.getMonth()===refDate.getMonth()&&d.getFullYear()===refDate.getFullYear(); }).length;
+  const totalPtsGeral = lancamentos.reduce((s,l) => !l.cancelado ? s+l.pontos : s, 0);
+  const lancTotal = lancamentos.filter(l => !l.cancelado).length;
 
   const exportarPDF = () => {
     const mesLabel = new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase();
@@ -165,10 +167,15 @@ tr.leader td.pts{color:#c9921a}
       </SectionHeader>
 
       <StatStrip cells={[
-        { label:'Vendedores ativos',      value:vendedores.filter(v=>v.ativo).length },
-        { label:'Lançamentos no mês',     value:lancMes },
-        { label:'Pontos no mês',          value:totalPtsmes, accent:true },
-        { label:'Líder do mês',           value:ranking[0]?nomeCurto(ranking[0].nome):'—', sub:ranking[0]?`${ranking[0].pm} pts`:''},
+        { label:'Vendedores ativos',
+          value: vendedores.filter(v=>v.ativo).length },
+        { label: modo==='geral' ? 'Lançamentos totais' : 'Lançamentos no mês',
+          value: modo==='geral' ? lancTotal : lancMes },
+        { label: modo==='geral' ? 'Pontos totais'      : 'Pontos no mês',
+          value: modo==='geral' ? totalPtsGeral         : totalPtsmes, accent:true },
+        { label: modo==='geral' ? 'Líder geral'        : 'Líder do mês',
+          value: ranking[0] ? nomeCurto(ranking[0].nome) : '—',
+          sub:   ranking[0] ? `${(modo==='geral'?ranking[0].pg:ranking[0].pm)} pts` : '' },
       ]}/>
 
       <div className="rk-table">
