@@ -85,10 +85,7 @@ function CriteriosSubtab({ state, dispatch, addToast }) {
   };
 
   const remover = (c) => {
-    if(lancamentos.some(l=>l.criterioId===c.id)) {
-      addToast('Critério com lançamentos não pode ser removido.','error'); return;
-    }
-    if(!window.confirm(`Remover "${c.nome}"?`)) return;
+    if(!window.confirm(`Remover "${c.nome}"? Os lançamentos existentes serão mantidos.`)) return;
     dispatch({ type:'REMOVE_CRITERIO', payload:c.id });
     addToast(`Critério removido.`,'info');
   };
