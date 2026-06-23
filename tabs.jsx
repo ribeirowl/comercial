@@ -5,7 +5,6 @@ const { useState, useMemo, useEffect, useRef } = React;
 function RankingTab({ state, dispatch, currentUser, viewDate }) {
   const { vendedores, lancamentos, criterios, config } = state;
   const [modo, setModo] = useState('mes');
-  const [modalVendedor, setModalVendedor] = useState(null);
   const lojas = state.lojas || [];
   const refDate = viewDate ? new Date(viewDate + 'T12:00:00') : new Date();
 
@@ -142,15 +141,6 @@ tr.leader td.pts{color:#c9921a}
 
   const mesLabel = refDate.toLocaleDateString('pt-BR',{month:'long'}).toUpperCase();
 
-  const lancsModal = modalVendedor ? lancamentos
-    .filter(l => {
-      if (Number(l.vendedorId) !== Number(modalVendedor.id) || l.cancelado) return false;
-      const d = new Date(l.data);
-      return d.getMonth() === refDate.getMonth() && d.getFullYear() === refDate.getFullYear();
-    })
-    .sort((a,b) => new Date(b.data) - new Date(a.data))
-  : [];
-
   return (
     <div>
       <SectionHeader
@@ -203,9 +193,7 @@ tr.leader td.pts{color:#c9921a}
           const pts = modo==='geral' ? v.pg : v.pm;
           const pct = maxPts>0 ? (pts/maxPts)*100 : 0;
           return (
-            <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}
-              style={{cursor:'pointer'}} onClick={()=>setModalVendedor(v)}
-              title="Ver lançamentos do mês">
+            <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}>
               <div className="rk-cell">
                 <span className={`rk-pos${i===0?' leader':''}`}>
                   {String(i+1).padStart(2,'0')}
@@ -322,70 +310,6 @@ tr.leader td.pts{color:#c9921a}
         )}
       </div>
 
-      {/* ── Modal de lançamentos do vendedor ── */}
-      {modalVendedor && (
-        <div onClick={()=>setModalVendedor(null)} style={{
-          position:'fixed',inset:0,background:'rgba(0,0,0,.65)',
-          display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:20,
-        }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
-            width:'100%',maxWidth:480,maxHeight:'80vh',display:'flex',flexDirection:'column',overflow:'hidden',
-          }}>
-            {/* cabeçalho */}
-            <div style={{padding:'18px 20px 14px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12,justifyContent:'space-between'}}>
-              <div style={{display:'flex',alignItems:'center',gap:12}}>
-                <Avatar nome={modalVendedor.nome} size={36} foto={modalVendedor.foto} achievements={modalVendedor.achievements}/>
-                <div>
-                  <div style={{fontFamily:'var(--font-display)',fontSize:17,letterSpacing:'.02em'}}>{modalVendedor.nome}</div>
-                  <div style={{fontSize:11,color:'var(--ink-4)',marginTop:1}}>Lançamentos · {mesLabel}</div>
-                </div>
-              </div>
-              <button className="btn-ghost" style={{padding:'4px 8px',fontSize:16}} onClick={()=>setModalVendedor(null)}>✕</button>
-            </div>
-            {/* lista */}
-            <div style={{overflowY:'auto',padding:'0 20px 16px'}}>
-              {lancsModal.length === 0
-                ? <EmptyState msg="Nenhum lançamento neste mês."/>
-                : (
-                  <table style={{width:'100%',borderCollapse:'collapse',marginTop:8}}>
-                    <thead>
-                      <tr style={{borderBottom:'1px solid var(--border)'}}>
-                        <th style={{padding:'8px 0',textAlign:'left',fontSize:9,fontFamily:'JetBrains Mono,monospace',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--ink-4)'}}>Data</th>
-                        <th style={{padding:'8px 0',textAlign:'left',fontSize:9,fontFamily:'JetBrains Mono,monospace',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--ink-4)'}}>Critério</th>
-                        <th style={{padding:'8px 0',textAlign:'right',fontSize:9,fontFamily:'JetBrains Mono,monospace',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--ink-4)'}}>Pts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lancsModal.map((l,i) => {
-                        const crit = criterios.find(c=>c.id===l.criterioId);
-                        const d = new Date(l.data);
-                        return (
-                          <tr key={l.id} style={{borderBottom:'1px solid var(--border)',background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
-                            <td style={{padding:'8px 0',fontSize:12,fontFamily:'JetBrains Mono,monospace',color:'var(--ink-4)',whiteSpace:'nowrap'}}>
-                              {d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
-                            </td>
-                            <td style={{padding:'8px 8px',fontSize:13}}>{crit?.nome || l.obs || '—'}</td>
-                            <td style={{padding:'8px 0',textAlign:'right',fontFamily:'JetBrains Mono,monospace',fontWeight:700,fontSize:14,color:'var(--accent)'}}>+{l.pontos}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{borderTop:'2px solid var(--border)'}}>
-                        <td colSpan={2} style={{padding:'10px 0',fontSize:11,color:'var(--ink-4)',fontFamily:'JetBrains Mono,monospace'}}>Total</td>
-                        <td style={{padding:'10px 0',textAlign:'right',fontFamily:'JetBrains Mono,monospace',fontWeight:700,fontSize:16,color:'var(--accent)'}}>
-                          {lancsModal.reduce((s,l)=>s+l.pontos,0)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                )
-              }
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
