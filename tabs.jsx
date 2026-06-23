@@ -1,10 +1,86 @@
 // tabs.jsx — RankingTab, LancarTab, VendedorTab, FeedTab
 const { useState, useMemo, useEffect, useRef } = React;
 
+// ── MODAL LANCAMENTOS VENDEDOR ────────────────────────────────────────────────
+function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose }) {
+  const mes = refDate.getMonth();
+  const ano = refDate.getFullYear();
+  const lancs = lancamentos
+    .filter(function(l) {
+      if (Number(l.vendedorId) !== Number(vendedor.id) || l.cancelado) return false;
+      var d = new Date(l.data);
+      return d.getMonth() === mes && d.getFullYear() === ano;
+    })
+    .sort(function(a, b) { return new Date(b.data) - new Date(a.data); });
+  const total = lancs.reduce(function(s, l) { return s + l.pontos; }, 0);
+  const mesLabel = refDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+  return (
+    <div onClick={onClose} style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,.65)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      zIndex:9999, padding:20,
+    }}>
+      <div onClick={function(e){ e.stopPropagation(); }} style={{
+        background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12,
+        width:'100%', maxWidth:460, maxHeight:'80vh',
+        display:'flex', flexDirection:'column', overflow:'hidden',
+      }}>
+        <div style={{padding:'16px 20px 12px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+          <div style={{display:'flex', alignItems:'center', gap:12}}>
+            <Avatar nome={vendedor.nome} size={34} foto={vendedor.foto} achievements={vendedor.achievements||[]}/>
+            <div>
+              <div style={{fontFamily:'var(--font-display)', fontSize:16}}>{vendedor.nome}</div>
+              <div style={{fontSize:11, color:'var(--ink-4)'}}>{"Lancamentos · " + mesLabel}</div>
+            </div>
+          </div>
+          <button className="btn-ghost" onClick={onClose} style={{fontSize:15, padding:'2px 8px'}}>x</button>
+        </div>
+        <div style={{overflowY:'auto', padding:'0 20px 16px'}}>
+          {lancs.length === 0
+            ? <EmptyState msg="Nenhum lancamento neste mes."/>
+            : (
+              <table style={{width:'100%', borderCollapse:'collapse', marginTop:8}}>
+                <thead>
+                  <tr style={{borderBottom:'1px solid var(--border)'}}>
+                    <th style={{padding:'7px 0', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Data</th>
+                    <th style={{padding:'7px 8px', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Criterio</th>
+                    <th style={{padding:'7px 0', textAlign:'right', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lancs.map(function(l, i) {
+                    var crit = criterios.find(function(c){ return c.id === l.criterioId; });
+                    var d = new Date(l.data);
+                    var dataStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+                    return (
+                      <tr key={l.id} style={{borderBottom:'1px solid var(--border)', background: i%2===0 ? 'transparent' : 'rgba(255,255,255,.02)'}}>
+                        <td style={{padding:'7px 0', fontSize:12, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{dataStr}</td>
+                        <td style={{padding:'7px 8px', fontSize:13}}>{(crit && crit.nome) || l.obs || '-'}</td>
+                        <td style={{padding:'7px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:14, color:'var(--accent)'}}>+{l.pontos}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{borderTop:'2px solid var(--border)'}}>
+                    <td colSpan={2} style={{padding:'9px 0', fontSize:11, color:'var(--ink-4)', fontFamily:'JetBrains Mono,monospace'}}>Total</td>
+                    <td style={{padding:'9px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:16, color:'var(--accent)'}}>{total}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── RANKING TAB ───────────────────────────────────────────────────────────────
 function RankingTab({ state, dispatch, currentUser, viewDate }) {
   const { vendedores, lancamentos, criterios, config } = state;
   const [modo, setModo] = useState('mes');
+  const [modalVendedor, setModalVendedor] = useState(null);
   const lojas = state.lojas || [];
   const refDate = viewDate ? new Date(viewDate + 'T12:00:00') : new Date();
 
@@ -193,7 +269,7 @@ tr.leader td.pts{color:#c9921a}
           const pts = modo==='geral' ? v.pg : v.pm;
           const pct = maxPts>0 ? (pts/maxPts)*100 : 0;
           return (
-            <div key={v.id} className={`rk-row${i===0?' pos-1':''}`}>
+            <div key={v.id} className={`rk-row${i===0?' pos-1':''}`} style={{cursor:'pointer'}} onClick={function(){ setModalVendedor(v); }}>
               <div className="rk-cell">
                 <span className={`rk-pos${i===0?' leader':''}`}>
                   {String(i+1).padStart(2,'0')}
@@ -310,6 +386,7 @@ tr.leader td.pts{color:#c9921a}
         )}
       </div>
 
+      {modalVendedor && <VendedorLancsModal vendedor={modalVendedor} lancamentos={lancamentos} criterios={criterios} refDate={refDate} onClose={function(){ setModalVendedor(null); }}/>}
     </div>
   );
 }
