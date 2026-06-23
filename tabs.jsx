@@ -53,7 +53,7 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
                     var d = new Date(l.data);
                     var dataStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
                     return (
-                      <tr key={l.id} style={{borderBottom:'1px solid var(--border)', background: i%2===0 ? 'transparent' : 'rgba(255,255,255,.02)'}}>
+                      <tr key={l.id} style={{borderBottom:'1px solid var(--border)', background: 'var(--surface)'}}>
                         <td style={{padding:'7px 0', fontSize:12, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{dataStr}</td>
                         <td style={{padding:'7px 8px', fontSize:13}}>{(crit && crit.nome) || l.obs || '-'}</td>
                         <td style={{padding:'7px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:14, color:'var(--accent)'}}>+{l.pontos}</td>
