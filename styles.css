@@ -145,7 +145,8 @@ body::before {
 }
 
 /* tema escuro: screen torna o fundo preto da logo-dark transparente, deixando só o amarelo/branco visível */
-.theme-carbon .masthead-logo {
+.theme-carbon .masthead-logo,
+.login-masthead .masthead-logo {
   mix-blend-mode: screen;
 }
 
