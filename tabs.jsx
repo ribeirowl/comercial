@@ -2,18 +2,21 @@
 const { useState, useMemo, useEffect, useRef } = React;
 
 // ── MODAL LANCAMENTOS VENDEDOR ────────────────────────────────────────────────
-function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose }) {
-  const mes = refDate.getMonth();
-  const ano = refDate.getFullYear();
-  const lancs = lancamentos
+function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, modo, onClose }) {
+  var mes = refDate.getMonth();
+  var ano = refDate.getFullYear();
+  var isGeral = modo === 'geral';
+  var lancs = lancamentos
     .filter(function(l) {
       if (Number(l.vendedorId) !== Number(vendedor.id) || l.cancelado) return false;
+      if (isGeral) return true;
       var d = new Date(l.data);
       return d.getMonth() === mes && d.getFullYear() === ano;
     })
     .sort(function(a, b) { return new Date(b.data) - new Date(a.data); });
-  const total = lancs.reduce(function(s, l) { return s + l.pontos; }, 0);
-  const mesLabel = refDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+  var total = lancs.reduce(function(s, l) { return s + l.pontos; }, 0);
+  var periodoLabel = isGeral ? 'TODOS OS LANCAMENTOS' : refDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+  var colSpanTotal = isGeral ? 3 : 2;
   return (
     <div onClick={onClose} style={{
       position:'fixed', inset:0, background:'rgba(0,0,0,.65)',
@@ -22,49 +25,52 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
     }}>
       <div onClick={function(e){ e.stopPropagation(); }} style={{
         background:'var(--paper-2)', border:'1px solid var(--rule)', borderRadius:12,
-        width:'100%', maxWidth:460, maxHeight:'80vh',
+        width:'100%', maxWidth: isGeral ? 560 : 460, maxHeight:'80vh',
         display:'flex', flexDirection:'column', overflow:'hidden',
       }}>
-        <div style={{padding:'16px 20px 12px', borderBottom:'1px solid var(--rule)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+        <div style={{padding:'16px 20px 12px', borderBottom:'1px solid var(--rule)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0}}>
           <div style={{display:'flex', alignItems:'center', gap:12}}>
             <Avatar nome={vendedor.nome} size={34} foto={vendedor.foto} achievements={vendedor.achievements||[]}/>
             <div>
               <div style={{fontFamily:'var(--font-display)', fontSize:16}}>{vendedor.nome}</div>
-              <div style={{fontSize:11, color:'var(--ink-4)'}}>{"Lancamentos · " + mesLabel}</div>
+              <div style={{fontSize:11, color:'var(--ink-4)'}}>{periodoLabel}</div>
             </div>
           </div>
           <button className="btn-ghost" onClick={onClose} style={{fontSize:15, padding:'2px 8px'}}>x</button>
         </div>
-        <div style={{overflowY:'auto', padding:'0 20px 16px'}}>
+        <div style={{overflowY:'auto', overflowX:'auto', padding:'0 20px 16px'}}>
           {lancs.length === 0
-            ? <EmptyState msg="Nenhum lancamento neste mes."/>
+            ? <EmptyState msg="Nenhum lancamento encontrado."/>
             : (
-              <table style={{width:'100%', borderCollapse:'collapse', marginTop:8}}>
+              <table style={{borderCollapse:'collapse', marginTop:8, minWidth: isGeral ? 480 : '100%', width: isGeral ? 'max-content' : '100%'}}>
                 <thead>
                   <tr style={{borderBottom:'1px solid var(--rule)'}}>
-                    <th style={{padding:'7px 0', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Data</th>
+                    <th style={{padding:'7px 8px 7px 0', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)', whiteSpace:'nowrap'}}>Data</th>
+                    {isGeral && <th style={{padding:'7px 8px', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)', whiteSpace:'nowrap'}}>Mes</th>}
                     <th style={{padding:'7px 8px', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Criterio</th>
-                    <th style={{padding:'7px 0', textAlign:'right', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Pts</th>
+                    <th style={{padding:'7px 0 7px 8px', textAlign:'right', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)', whiteSpace:'nowrap'}}>Pts</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lancs.map(function(l, i) {
+                  {lancs.map(function(l) {
                     var crit = criterios.find(function(c){ return c.id === l.criterioId; });
                     var d = new Date(l.data);
                     var dataStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+                    var mesStr = d.toLocaleDateString('pt-BR', {month:'short', year:'2-digit'}).toUpperCase();
                     return (
-                      <tr key={l.id} style={{borderBottom:'1px solid var(--rule)', background: 'var(--paper-2)'}}>
-                        <td style={{padding:'7px 0', fontSize:12, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{dataStr}</td>
-                        <td style={{padding:'7px 8px', fontSize:13}}>{(crit && crit.nome) || l.obs || '-'}</td>
-                        <td style={{padding:'7px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:14, color:'var(--accent)'}}>+{l.pontos}</td>
+                      <tr key={l.id} style={{borderBottom:'1px solid var(--rule)', background:'var(--paper-2)'}}>
+                        <td style={{padding:'7px 8px 7px 0', fontSize:12, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{dataStr}</td>
+                        {isGeral && <td style={{padding:'7px 8px', fontSize:11, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{mesStr}</td>}
+                        <td style={{padding:'7px 8px', fontSize:13, whiteSpace: isGeral ? 'nowrap' : 'normal'}}>{(crit && crit.nome) || l.obs || '-'}</td>
+                        <td style={{padding:'7px 0 7px 8px', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:14, color:'var(--accent)', whiteSpace:'nowrap'}}>+{l.pontos}</td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
                   <tr style={{borderTop:'2px solid var(--rule)'}}>
-                    <td colSpan={2} style={{padding:'9px 0', fontSize:11, color:'var(--ink-4)', fontFamily:'JetBrains Mono,monospace'}}>Total</td>
-                    <td style={{padding:'9px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:16, color:'var(--accent)'}}>{total}</td>
+                    <td colSpan={colSpanTotal} style={{padding:'9px 0', fontSize:11, color:'var(--ink-4)', fontFamily:'JetBrains Mono,monospace'}}>Total</td>
+                    <td style={{padding:'9px 0 9px 8px', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:16, color:'var(--accent)'}}>{total}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -386,7 +392,7 @@ tr.leader td.pts{color:#c9921a}
         )}
       </div>
 
-      {modalVendedor && <VendedorLancsModal vendedor={modalVendedor} lancamentos={lancamentos} criterios={criterios} refDate={refDate} onClose={function(){ setModalVendedor(null); }}/>}
+      {modalVendedor && <VendedorLancsModal vendedor={modalVendedor} lancamentos={lancamentos} criterios={criterios} refDate={refDate} modo={modo} onClose={function(){ setModalVendedor(null); }}/>}
     </div>
   );
 }
