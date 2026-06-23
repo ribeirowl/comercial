@@ -21,11 +21,11 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
       zIndex:9999, padding:20,
     }}>
       <div onClick={function(e){ e.stopPropagation(); }} style={{
-        background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12,
+        background:'var(--paper-2)', border:'1px solid var(--rule)', borderRadius:12,
         width:'100%', maxWidth:460, maxHeight:'80vh',
         display:'flex', flexDirection:'column', overflow:'hidden',
       }}>
-        <div style={{padding:'16px 20px 12px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+        <div style={{padding:'16px 20px 12px', borderBottom:'1px solid var(--rule)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
           <div style={{display:'flex', alignItems:'center', gap:12}}>
             <Avatar nome={vendedor.nome} size={34} foto={vendedor.foto} achievements={vendedor.achievements||[]}/>
             <div>
@@ -41,7 +41,7 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
             : (
               <table style={{width:'100%', borderCollapse:'collapse', marginTop:8}}>
                 <thead>
-                  <tr style={{borderBottom:'1px solid var(--border)'}}>
+                  <tr style={{borderBottom:'1px solid var(--rule)'}}>
                     <th style={{padding:'7px 0', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Data</th>
                     <th style={{padding:'7px 8px', textAlign:'left', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Criterio</th>
                     <th style={{padding:'7px 0', textAlign:'right', fontSize:9, fontFamily:'JetBrains Mono,monospace', fontWeight:700, textTransform:'uppercase', color:'var(--ink-4)'}}>Pts</th>
@@ -53,7 +53,7 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
                     var d = new Date(l.data);
                     var dataStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
                     return (
-                      <tr key={l.id} style={{borderBottom:'1px solid var(--border)', background: 'var(--surface)'}}>
+                      <tr key={l.id} style={{borderBottom:'1px solid var(--rule)', background: 'var(--paper-2)'}}>
                         <td style={{padding:'7px 0', fontSize:12, fontFamily:'JetBrains Mono,monospace', color:'var(--ink-4)', whiteSpace:'nowrap'}}>{dataStr}</td>
                         <td style={{padding:'7px 8px', fontSize:13}}>{(crit && crit.nome) || l.obs || '-'}</td>
                         <td style={{padding:'7px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:14, color:'var(--accent)'}}>+{l.pontos}</td>
@@ -62,7 +62,7 @@ function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, onClose
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{borderTop:'2px solid var(--border)'}}>
+                  <tr style={{borderTop:'2px solid var(--rule)'}}>
                     <td colSpan={2} style={{padding:'9px 0', fontSize:11, color:'var(--ink-4)', fontFamily:'JetBrains Mono,monospace'}}>Total</td>
                     <td style={{padding:'9px 0', textAlign:'right', fontFamily:'JetBrains Mono,monospace', fontWeight:700, fontSize:16, color:'var(--accent)'}}>{total}</td>
                   </tr>
