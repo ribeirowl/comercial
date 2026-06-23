@@ -61,6 +61,14 @@ function LoginScreen({ onLogin, state, logoSrc }) {
 
   return (
     <div className="login-page">
+      <div className="login-video-bg">
+        <iframe
+          src="https://www.youtube.com/embed/n7GdFFlYFug?autoplay=1&mute=1&loop=1&playlist=n7GdFFlYFug&controls=0&showinfo=0&rel=0&modestbranding=1&disablekb=1&fs=0&playsinline=1"
+          allow="autoplay; encrypted-media"
+          title="bg"
+        />
+      </div>
+      <div className="login-video-overlay"/>
       <div className="login-masthead">
         <img
           src={logoSrc || 'assets/logo.png'} alt="YES! Mocelin"
