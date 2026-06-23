@@ -30,6 +30,35 @@ function useLogo(src) {
   return processed; // null até o canvas terminar; componentes usam fallback
 }
 
+// Remove fundo preto do PNG via canvas: pixels com os 3 canais < 30 viram transparentes.
+function useLogoDark(src) {
+  const [processed, setProcessed] = useState(null);
+  useEffect(() => {
+    if (!src) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.naturalWidth  || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i] < 30 && d[i+1] < 30 && d[i+2] < 30) d[i+3] = 0;
+        }
+        ctx.putImageData(id, 0, 0);
+        setProcessed(canvas.toDataURL('image/png'));
+      } catch(e) { setProcessed(src); }
+    };
+    img.onerror = () => setProcessed(src);
+    img.src = src;
+  }, [src]);
+  return processed;
+}
+
 const ACCENT_SWATCHES = [
   { name:'Amarelo Yes', value:'#ffc41f' },
   { name:'Dourado',     value:'#c9921a' },
@@ -402,7 +431,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const logoSrc     = useLogo('assets/logo.png');
-  const logoDarkSrc = 'assets/logo-dark.png'; // logo escura: não processa canvas (tem texto branco que seria removido)
+  const logoDarkSrc = useLogoDark('assets/logo-dark.png');
 
   // Dispatch: atualiza estado local imediatamente e sincroniza com Supabase em background
   const dispatch = action => {
