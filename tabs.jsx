@@ -322,8 +322,6 @@ tr.leader td.pts{color:#c9921a}
         )}
       </div>
 
-    </div>
-
       {/* ── Modal de lançamentos do vendedor ── */}
       {modalVendedor && (
         <div onClick={()=>setModalVendedor(null)} style={{
