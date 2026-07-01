@@ -1,6 +1,13 @@
 // tabs.jsx — RankingTab, LancarTab, VendedorTab, FeedTab
 const { useState, useMemo, useEffect, useRef } = React;
 
+function ultimoDiaUtil(mesLanc) {
+  var p = mesLanc.split('-');
+  var d = new Date(Number(p[0]), Number(p[1]), 0, 12, 0, 0); // dia 0 do mês seguinte = último dia do mês
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return d;
+}
+
 // ── MODAL LANCAMENTOS VENDEDOR ────────────────────────────────────────────────
 function VendedorLancsModal({ vendedor, lancamentos, criterios, refDate, modo, onClose }) {
   var mes = refDate.getMonth();
@@ -582,7 +589,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         dispatch({ type: 'ADD_LANCAMENTO', payload: {
           id: maxId, vendedorId: Number(vid), criterioId: c.id,
           pontos: pts, obs: obs.trim(),
-          data: mesLanc ? new Date(mesLanc + '-15T12:00:00').toISOString() : new Date().toISOString(),
+          data: mesLanc ? ultimoDiaUtil(mesLanc).toISOString() : new Date().toISOString(),
           streakAplicado: bonus,
           lancadoPor: currentUser?.username || null,
         }});
@@ -753,7 +760,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                 />
                 {mesLanc && (
                   <div style={{marginTop:4,fontSize:11,color:'var(--accent)',fontFamily:'JetBrains Mono,monospace'}}>
-                    Lançando em: {new Date(mesLanc+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
+                    Lançando em: {ultimoDiaUtil(mesLanc).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}
                     {' '}· <button className="btn-ghost" style={{fontSize:11,padding:'0 4px'}} onClick={()=>setMesLanc('')}>usar mês atual</button>
                   </div>
                 )}
