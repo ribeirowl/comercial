@@ -684,6 +684,19 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                     : 0;
                   const limRest = c.limitesPorMes > 0 ? c.limitesPorMes - usadoMes : null;
                   const esgotado = limRest !== null && limRest <= 0;
+                  const bloqueio = esgotado ? (function() {
+                    var n = refMes ? new Date(refMes) : new Date();
+                    var bl = lancamentos.filter(function(l) {
+                      if (l.cancelado || l.canceladoPor) return false;
+                      if (Number(l.vendedorId) !== Number(vid) || l.criterioId !== c.id || l.campanhaId) return false;
+                      var d = new Date(l.data);
+                      return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+                    });
+                    if (!bl.length) return null;
+                    var d0 = new Date(bl[0].data);
+                    var ds = d0.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+                    return (bl[0].lancadoPor ? bl[0].lancadoPor + ' · ' : '') + ds;
+                  })() : null;
                   const isMetaSemanal = c.nome === 'Meta semanal atingida';
                   const bonus = streak.ativo && isMetaSemanal;
                   const marcadoSim = c.modo === 'simnao' && r.simNao === 'sim';
@@ -706,7 +719,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
                           {limRest !== null && (
                             <span style={{color: esgotado?'var(--brand-red)':'var(--ink-4)'}}>
                               {esgotado
-                                ? ' · limite atingido'
+                                ? (' · limite atingido' + (bloqueio ? ' (' + bloqueio + ')' : ''))
                                 : ` · ${limRest} ${usarPontos ? 'pts restantes' : `vez${limRest!==1?'es':''} restante${limRest!==1?'s':''}`}`}
                             </span>
                           )}
