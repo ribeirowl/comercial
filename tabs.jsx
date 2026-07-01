@@ -547,7 +547,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
     if (!selecionado) return false;
     // excluir se esgotado (limite mensal atingido)
     if (vid && c.limitesPorMes > 0) {
-      const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
+      const refMes = mesLanc ? ultimoDiaUtil(mesLanc).toISOString() : null;
       const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
       const usado = usarPontos
         ? pontosNoCriterioMes(Number(vid), c.id, lancamentos, refMes)
@@ -572,7 +572,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
         let pts = c.modo === 'simnao' ? c.pontos : Number(r.pts);
         // blindagem: respeitar limite mensal conforme tipoLimite e mês selecionado
         if (c.limitesPorMes > 0) {
-          const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
+          const refMes = mesLanc ? ultimoDiaUtil(mesLanc).toISOString() : null;
           if (c.tipoLimite === 'pontos' && c.modo === 'parcial') {
             const usado = pontosNoCriterioMes(Number(vid), c.id, lancamentos, refMes);
             const restante = c.limitesPorMes - usado;
@@ -675,7 +675,7 @@ function LancarTab({ state, dispatch, addToast, currentUser }) {
               <div className="lanc-lista">
                 {criterios.filter(c => !c.oculto).map(c => {
                   const r = resps[c.id] || {};
-                  const refMes = mesLanc ? mesLanc + '-15T12:00:00' : null;
+                  const refMes = mesLanc ? ultimoDiaUtil(mesLanc).toISOString() : null;
                   const usarPontos = c.modo === 'parcial' && c.tipoLimite === 'pontos';
                   const usadoMes = c.limitesPorMes > 0
                     ? (usarPontos

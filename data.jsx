@@ -471,7 +471,7 @@ function countNoMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return !l.cancelado && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).length;
 }
 
@@ -479,7 +479,7 @@ function pontosNoCriterioMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return !l.cancelado && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).reduce((s,l)=>s+l.pontos,0);
 }
 
