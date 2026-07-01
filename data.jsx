@@ -430,7 +430,7 @@ function calcularStreak(vendedorId, lancamentos, criterios, streakSemanas) {
   if (!meta) return { ativo:false, semanas:0 };
   const vistos = new Map();
   lancamentos
-    .filter(l=>l.vendedorId===vendedorId && l.criterioId===meta.id && !l.cancelado)
+    .filter(l=>l.vendedorId===vendedorId && l.criterioId===meta.id && !l.cancelado && !l.canceladoPor)
     .forEach(l=>{ const {year,week}=getISOWeek(l.data); const k=`${year}-${String(week).padStart(2,'0')}`; if(!vistos.has(k))vistos.set(k,true); });
   const semanas = Array.from(vistos.keys()).sort().reverse();
   const now = getISOWeek(new Date());
@@ -452,8 +452,11 @@ function proximoNivel(pts, niveis) {
   return [...niveis].sort((a,b)=>a.minPontos-b.minPontos).find(n=>n.minPontos>pts)||null;
 }
 
+// lançamento ativo = não cancelado (checa cancelado E canceladoPor para cobrir caso em que a coluna cancelado não existe no banco)
+const _ativo = l => !l.cancelado && !l.canceladoPor;
+
 // lancamentos de campanha são excluídos do ranking geral
-const _semCampanha = l => !l.cancelado && !l.campanhaId;
+const _semCampanha = l => _ativo(l) && !l.campanhaId;
 
 function pontosTotal(id, lancs) {
   return lancs.filter(l=>l.vendedorId===id && _semCampanha(l)).reduce((s,l)=>s+l.pontos,0);
@@ -471,7 +474,7 @@ function countNoMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return !l.cancelado && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return _ativo(l) && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).length;
 }
 
@@ -479,7 +482,7 @@ function pontosNoCriterioMes(vid, cid, lancs, refDate) {
   const n = refDate ? new Date(refDate) : new Date();
   return lancs.filter(l=>{
     const d=new Date(l.data);
-    return !l.cancelado && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+    return _ativo(l) && l.vendedorId===vid && l.criterioId===cid && _semCampanha(l) && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
   }).reduce((s,l)=>s+l.pontos,0);
 }
 
